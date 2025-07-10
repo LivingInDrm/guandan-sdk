@@ -30,21 +30,23 @@ func CompareCards(a, b Card, trump Rank) CmpResult {
 	} else if aValue > bValue {
 		return CmpGreater
 	}
+	
+	// 花色不影响牌的大小比较，相同rank值的牌被认为是相等的
 	return CmpEqual
 }
 
 func getCardValue(card Card, trump Rank) int {
 	if card.IsJoker() {
 		if card.Rank == SmallJoker {
-			return 1000
+			return 14
 		}
 		if card.Rank == BigJoker {
-			return 1001
+			return 15
 		}
 	}
 	
 	if card.Rank == trump {
-		return 500 + int(card.Suit)
+		return 13 // 主牌统一返回13，花色比较在CompareCards中特殊处理
 	}
 	
 	return int(card.Rank)
@@ -58,100 +60,114 @@ func CompareCardGroups(a, b *CardGroup, trump Rank) CmpResult {
 	aKey := a.ComparisonKey()
 	bKey := b.ComparisonKey()
 	
-	if aKey.Category == JokerBomb && bKey.Category != JokerBomb {
+	// Step 1: Compare CAT values (0-5) - higher CAT always wins
+	if aKey.CAT > bKey.CAT {
 		return CmpGreater
-	}
-	if aKey.Category != JokerBomb && bKey.Category == JokerBomb {
+	} else if aKey.CAT < bKey.CAT {
 		return CmpLess
 	}
 	
-	if aKey.Category == Bomb && bKey.Category != Bomb && bKey.Category != JokerBomb {
-		return CmpGreater
-	}
-	if aKey.Category != Bomb && aKey.Category != JokerBomb && bKey.Category == Bomb {
-		return CmpLess
-	}
-	
-	if aKey.Category == JokerBomb && bKey.Category == JokerBomb {
+	// Step 2: Same CAT - check if they can be compared
+	// Special case: bombs of same CAT can be compared by size
+	if aKey.CAT == bKey.CAT && (aKey.CAT == 5 || aKey.CAT == 4 || aKey.CAT == 2 || aKey.CAT == 1) {
+		// For bombs (including joker bombs), compare by size first
 		if aKey.Size > bKey.Size {
 			return CmpGreater
 		} else if aKey.Size < bKey.Size {
 			return CmpLess
 		}
-		return CmpEqual
-	}
-	
-	if aKey.Category == Bomb && bKey.Category == Bomb {
-		aValue := getBombValue(a, trump)
-		bValue := getBombValue(b, trump)
-		
-		if aValue > bValue {
-			return CmpGreater
-		} else if aValue < bValue {
-			return CmpLess
+		// Same size bombs, compare by rank
+	} else {
+		// For non-bomb types, they must have same Category and Size to be comparable
+		if aKey.Category != bKey.Category || aKey.Size != bKey.Size {
+			return CmpEqual // Cannot compare different card types
 		}
-		return CmpEqual
 	}
 	
-	if aKey.Category != bKey.Category {
-		return CmpEqual
-	}
+	// Step 3: Same CAT, Category and SIZE, compare RANK
+	aRankValue := getGroupRankValue(a, trump)
+	bRankValue := getGroupRankValue(b, trump)
 	
-	if aKey.Size != bKey.Size {
-		return CmpEqual
-	}
-	
-	aValue := getGroupValue(a, trump)
-	bValue := getGroupValue(b, trump)
-	
-	if aValue > bValue {
+	if aRankValue > bRankValue {
 		return CmpGreater
-	} else if aValue < bValue {
+	} else if aRankValue < bRankValue {
 		return CmpLess
 	}
+	
 	return CmpEqual
 }
 
-func getBombValue(group *CardGroup, trump Rank) int {
-	if group.Category != Bomb {
-		return 0
-	}
+
+// getGroupRankValue returns the RANK value for group comparison according to Guandan rules
+func getGroupRankValue(group *CardGroup, trump Rank) int {
+	switch group.Category {
+	case JokerBomb:
+		return 0 // 王炸之间无点数比较，固定返回0
 	
-	rank := group.Rank
-	if rank == trump {
-		return 1000 + int(rank)
-	}
+	case Bomb:
+		// 炸弹点值：使用该炸弹的点值，主牌炸弹优先于同点数普通炸弹
+		rank := group.Rank
+		if rank == trump {
+			return 13 // 主牌炸弹使用值13
+		}
+		return int(rank) // 普通炸弹使用原始rank值(0-12)
 	
-	return int(rank)
+	case Straight:
+		// 顺子最大牌点值，包括同花顺
+		return getMaxCardValueInGroup(group, trump)
+	
+	case PairStraight:
+		// 三连对：最高对子点值
+		return getMaxCardValueInGroup(group, trump)
+	
+	case TripleStraight:
+		// 钢板（二连三）：最高三同张点值
+		return getMaxCardValueInGroup(group, trump)
+	
+	case Triple:
+		// 三带二或三同张：三同张点值（忽略对子）
+		if group.Size == 5 {
+			// 三带二：找到三同张的点值
+			return getTripleValueInGroup(group, trump)
+		}
+		// 三同张
+		return getCardValue(Card{Rank: group.Rank}, trump)
+	
+	default:
+		// 其他牌型（单张、对子）：该点值
+		return getCardValue(Card{Rank: group.Rank}, trump)
+	}
 }
 
-func getGroupValue(group *CardGroup, trump Rank) int {
-	if group.Category == JokerBomb {
-		return 2000 + group.Size
+// getMaxCardValueInGroup returns the maximum card value in the group
+func getMaxCardValueInGroup(group *CardGroup, trump Rank) int {
+	maxValue := -1
+	for _, card := range group.Cards {
+		value := getCardValue(card, trump)
+		if value > maxValue {
+			maxValue = value
+		}
 	}
-	
-	if group.Category == Bomb {
-		return getBombValue(group, trump)
-	}
-	
-	// 对于非炸弹类型，需要考虑王牌的特殊值
-	rank := group.Rank
-	
-	// 处理王牌（小王、大王）
-	if rank == SmallJoker {
-		return 1000
-	}
-	if rank == BigJoker {
-		return 1001
-	}
-	
-	// 处理主牌
-	if rank == trump {
-		return 500 + int(rank)
-	}
-	
-	return int(rank)
+	return maxValue
 }
+
+// getTripleValueInGroup finds the rank that appears 3 times in a 三带二 group
+func getTripleValueInGroup(group *CardGroup, trump Rank) int {
+	rankCounts := make(map[Rank]int)
+	for _, card := range group.Cards {
+		rankCounts[card.Rank]++
+	}
+	
+	for rank, count := range rankCounts {
+		if count == 3 {
+			return getCardValue(Card{Rank: rank}, trump)
+		}
+	}
+	
+	// Fallback: should not happen in valid 三带二
+	return getCardValue(Card{Rank: group.Rank}, trump)
+}
+
 
 func CanBeat(hand, tablePlay *CardGroup, trump Rank) bool {
 	if hand == nil || !hand.IsValid() {

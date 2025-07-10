@@ -32,15 +32,15 @@ func TestRankString(t *testing.T) {
 		rank     Rank
 		expected string
 	}{
-		{Two, "1"},     // Two = 1 (iota + 1)
-		{Three, "2"},   // Three = 2
-		{Four, "3"},    // Four = 3
-		{Five, "4"},    // Five = 4
-		{Six, "5"},     // Six = 5
-		{Seven, "6"},   // Seven = 6
-		{Eight, "7"},   // Eight = 7
-		{Nine, "8"},    // Nine = 8
-		{Ten, "9"},     // Ten = 9
+		{Two, "2"},     // Two = 0 (iota)
+		{Three, "3"},   // Three = 1
+		{Four, "4"},    // Four = 2
+		{Five, "5"},    // Five = 3
+		{Six, "6"},     // Six = 4
+		{Seven, "7"},   // Seven = 5
+		{Eight, "8"},   // Eight = 6
+		{Nine, "9"},    // Nine = 7
+		{Ten, "10"},    // Ten = 8
 		{Jack, "J"},
 		{Queen, "Q"},
 		{King, "K"},
@@ -115,8 +115,8 @@ func TestCardString(t *testing.T) {
 	}{
 		{"Hearts Ace", NewCard(Hearts, Ace), "♥A"},
 		{"Spades King", NewCard(Spades, King), "♠K"},
-		{"Diamonds Two", NewCard(Diamonds, Two), "♦1"},   // Two = 1
-		{"Clubs Ten", NewCard(Clubs, Ten), "♣9"},         // Ten = 9
+		{"Diamonds Two", NewCard(Diamonds, Two), "♦2"},   // Two displays as "2"
+		{"Clubs Ten", NewCard(Clubs, Ten), "♣10"},        // Ten displays as "10"
 		{"Small Joker", NewJoker(SmallJoker), "小王"},
 		{"Big Joker", NewJoker(BigJoker), "大王"},
 	}

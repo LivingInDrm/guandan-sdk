@@ -35,7 +35,7 @@ func (s Suit) String() string {
 type Rank int
 
 const (
-	Two Rank = iota + 1
+	Two Rank = iota
 	Three
 	Four
 	Five
@@ -48,20 +48,38 @@ const (
 	Queen
 	King
 	Ace
-	SmallJoker
-	BigJoker
+	SmallJoker = 14
+	BigJoker = 15
 )
 
 func (r Rank) String() string {
 	switch r {
-	case Ace:
-		return "A"
+	case Two:
+		return "2"
+	case Three:
+		return "3"
+	case Four:
+		return "4"
+	case Five:
+		return "5"
+	case Six:
+		return "6"
+	case Seven:
+		return "7"
+	case Eight:
+		return "8"
+	case Nine:
+		return "9"
+	case Ten:
+		return "10"
 	case Jack:
 		return "J"
 	case Queen:
 		return "Q"
 	case King:
 		return "K"
+	case Ace:
+		return "A"
 	case SmallJoker:
 		return "小王"
 	case BigJoker:

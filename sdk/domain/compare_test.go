@@ -69,11 +69,11 @@ func TestCardCompare(t *testing.T) {
 			expected: CmpGreater,
 		},
 		{
-			name:     "Trump suits matter for same rank",
+			name:     "Same rank trumps are equal",
 			cardA:    NewCard(Hearts, Two),
 			cardB:    NewCard(Spades, Two),
 			trump:    Two,
-			expected: CmpLess,
+			expected: CmpEqual,
 		},
 	}
 
@@ -370,7 +370,7 @@ func TestCompareCardsEdgeCases(t *testing.T) {
 			cardA:    NewCard(Hearts, Two),
 			cardB:    NewCard(Diamonds, Two),
 			trump:    Two,
-			expected: CmpLess, // Hearts (0) < Diamonds (1)
+			expected: CmpEqual, // Same rank trumps are equal
 		},
 		{
 			name:     "Trump vs non-trump same numeric rank",
@@ -391,7 +391,7 @@ func TestCompareCardsEdgeCases(t *testing.T) {
 			cardA:    NewCard(Spades, Five),
 			cardB:    NewCard(Clubs, Five),
 			trump:    Five,
-			expected: CmpGreater, // Spades (3) > Clubs (2)
+			expected: CmpEqual, // Same rank trumps are equal
 		},
 	}
 
@@ -915,7 +915,7 @@ func TestEdgeCasesAndBoundaryConditions(t *testing.T) {
 			groupA:   NewCardGroup([]Card{NewCard(Hearts, Six), NewCard(Spades, Seven), NewCard(Hearts, Eight), NewCard(Spades, Nine), NewCard(Hearts, Ten)}),
 			groupB:   NewCardGroup([]Card{NewCard(Hearts, Nine), NewCard(Spades, Ten), NewCard(Hearts, Jack), NewCard(Spades, Queen), NewCard(Hearts, King)}),
 			trump:    Seven,
-			expected: CmpLess, // 第一个顺子含主牌但起始点数更低
+			expected: CmpGreater, // 第一个顺子含主牌(7=13)，比第二个顺子的最大牌(K=12)大
 		},
 		// 单王 vs 主牌
 		{
