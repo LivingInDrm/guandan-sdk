@@ -144,15 +144,18 @@ func (gs *GameServiceImpl) StartNextDeal(matchID domain.MatchID) error {
 	}
 	
 	dealNumber := matchInstance.MatchCtx.CurrentDeal + 1
-	trump := gs.calculateTrump(dealNumber)
 	firstPlayer := gs.calculateFirstPlayer(dealNumber)
 	
-	if err := matchInstance.Engine.StartDeal(dealNumber, trump, firstPlayer); err != nil {
+	if err := matchInstance.Engine.StartDeal(dealNumber, firstPlayer); err != nil {
 		return fmt.Errorf("failed to start deal: %w", err)
 	}
 	
 	if err := matchInstance.Engine.DealCards(); err != nil {
 		return fmt.Errorf("failed to deal cards: %w", err)
+	}
+	
+	if err := matchInstance.Engine.DetermineTrump(); err != nil {
+		return fmt.Errorf("failed to determine trump: %w", err)
 	}
 	
 	if err := matchInstance.Engine.StartTribute(); err != nil {

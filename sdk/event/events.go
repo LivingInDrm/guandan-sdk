@@ -250,6 +250,48 @@ func NewMatchEndedEvent(matchID domain.MatchID, winnerTeam domain.TeamID, finalS
 	}
 }
 
+type TributeSelectionRequestedEvent struct {
+	BaseEvent
+	Selector        domain.SeatID            // Player who needs to select
+	AvailableCards  map[domain.SeatID]domain.Card // giver -> card
+}
+
+func NewTributeSelectionRequestedEvent(matchID domain.MatchID, selector domain.SeatID, availableCards map[domain.SeatID]domain.Card) *TributeSelectionRequestedEvent {
+	return &TributeSelectionRequestedEvent{
+		BaseEvent: BaseEvent{
+			EventTypeName: "TributeSelectionRequested",
+			EventTime:     time.Now(),
+			MatchIDValue:  matchID,
+		},
+		Selector:       selector,
+		AvailableCards: availableCards,
+	}
+}
+
+type TributeCardSelectedEvent struct {
+	BaseEvent
+	Selector     domain.SeatID // Player who selected
+	SelectedFrom domain.SeatID // Player who gave the selected card
+	SelectedCard domain.Card   // The selected card
+	RemainingTo  domain.SeatID // Player who gets the remaining card
+	RemainingCard domain.Card  // The remaining card
+}
+
+func NewTributeCardSelectedEvent(matchID domain.MatchID, selector, selectedFrom domain.SeatID, selectedCard domain.Card, remainingTo domain.SeatID, remainingCard domain.Card) *TributeCardSelectedEvent {
+	return &TributeCardSelectedEvent{
+		BaseEvent: BaseEvent{
+			EventTypeName: "TributeCardSelected",
+			EventTime:     time.Now(),
+			MatchIDValue:  matchID,
+		},
+		Selector:      selector,
+		SelectedFrom:  selectedFrom,
+		SelectedCard:  selectedCard,
+		RemainingTo:   remainingTo,
+		RemainingCard: remainingCard,
+	}
+}
+
 type EventBus struct {
 	mu           sync.RWMutex
 	subscribers  map[domain.MatchID][]chan<- DomainEvent

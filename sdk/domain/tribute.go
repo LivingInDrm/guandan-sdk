@@ -37,6 +37,7 @@ const (
 	TributePhaseIdle TributePhase = iota
 	TributePhaseRequested
 	TributePhaseGiving
+	TributePhaseSelection  // Double Down 卡牌选择阶段
 	TributePhaseReturning
 	TributePhaseCompleted
 )
@@ -49,6 +50,8 @@ func (tp TributePhase) String() string {
 		return "Requested"
 	case TributePhaseGiving:
 		return "Giving"
+	case TributePhaseSelection:
+		return "Selection"
 	case TributePhaseReturning:
 		return "Returning"
 	case TributePhaseCompleted:
@@ -67,6 +70,11 @@ type TributeInfo struct {
 	GivenTributes     map[SeatID]Card   // from -> card
 	ReturnedTributes  map[SeatID]Card   // from -> card
 	Phase             TributePhase
+	
+	// Double Down 特殊字段
+	AvailableCards    map[SeatID]Card   // 可选择的贡牌 (giver -> card) for Double Down
+	SelectedCards     map[SeatID]Card   // 已选择的贡牌 (receiver -> card) for Double Down
+	ActualReceivers   map[SeatID]SeatID // 实际接收者映射 (giver -> actual_receiver) for return tribute
 }
 
 // NewTributeInfo 创建新的贡牌信息
@@ -79,6 +87,9 @@ func NewTributeInfo(scenario TributeScenario, hasImmunity bool) *TributeInfo {
 		GivenTributes:    make(map[SeatID]Card),
 		ReturnedTributes: make(map[SeatID]Card),
 		Phase:            TributePhaseIdle,
+		AvailableCards:   make(map[SeatID]Card),
+		SelectedCards:    make(map[SeatID]Card),
+		ActualReceivers:  make(map[SeatID]SeatID),
 	}
 }
 
@@ -122,57 +133,84 @@ func DetermineTributeScenario(lastRankings []SeatID) TributeScenario {
 }
 
 // CheckTributeImmunity 检查是否有贡牌免疫
-func CheckTributeImmunity(scenario TributeScenario, playerBigJokers map[SeatID]int) bool {
+func CheckTributeImmunity(scenario TributeScenario, playerBigJokers map[SeatID]int, lastRankings []SeatID) bool {
+	if len(lastRankings) != 4 {
+		return false
+	}
+	
 	switch scenario {
 	case TributeScenarioDoubleDown:
 		// 败方队伍(3+4)合计握两张大王
-		return playerBigJokers[SeatSouth]+playerBigJokers[SeatNorth] >= 2
+		third := lastRankings[2]
+		fourth := lastRankings[3]
+		return playerBigJokers[third]+playerBigJokers[fourth] >= 2
 	case TributeScenarioSingleLast:
 		// 最后一名(4)单独握两张大王
-		return playerBigJokers[SeatNorth] >= 2
+		fourth := lastRankings[3]
+		return playerBigJokers[fourth] >= 2
 	case TributeScenarioPartnerLast:
 		// 第三名(3)单独握两张大王
-		return playerBigJokers[SeatSouth] >= 2
+		third := lastRankings[2]
+		return playerBigJokers[third] >= 2
 	default:
 		return false
 	}
 }
 
 // CalculateTributeRequirements 计算贡牌要求
-func CalculateTributeRequirements(scenario TributeScenario) map[SeatID]SeatID {
+func CalculateTributeRequirements(scenario TributeScenario, lastRankings []SeatID) map[SeatID]SeatID {
 	requirements := make(map[SeatID]SeatID)
+	
+	if len(lastRankings) != 4 {
+		return requirements
+	}
+	
+	first := lastRankings[0]
+	second := lastRankings[1]
+	third := lastRankings[2]
+	fourth := lastRankings[3]
 
 	switch scenario {
 	case TributeScenarioDoubleDown:
 		// 败方队伍(3、4)各交给胜方队伍(1、2)
-		requirements[SeatSouth] = SeatEast // 3->1
-		requirements[SeatNorth] = SeatWest // 4->2
+		requirements[third] = first   // 3->1
+		requirements[fourth] = second // 4->2
 	case TributeScenarioSingleLast:
 		// 最后一名(4)交给第一名(1)
-		requirements[SeatNorth] = SeatEast // 4->1
+		requirements[fourth] = first // 4->1
 	case TributeScenarioPartnerLast:
 		// 第三名(3)交给第一名(1)
-		requirements[SeatSouth] = SeatEast // 3->1
+		requirements[third] = first // 3->1
 	}
 
 	return requirements
 }
 
 // CalculateReturnRequirements 计算还贡要求
-func CalculateReturnRequirements(scenario TributeScenario) map[SeatID]SeatID {
+func CalculateReturnRequirements(scenario TributeScenario, lastRankings []SeatID) map[SeatID]SeatID {
 	requirements := make(map[SeatID]SeatID)
+	
+	if len(lastRankings) != 4 {
+		return requirements
+	}
+	
+	first := lastRankings[0]
+	second := lastRankings[1]
+	third := lastRankings[2]
+	fourth := lastRankings[3]
 
 	switch scenario {
 	case TributeScenarioDoubleDown:
 		// 胜方队伍(1、2)各还给败方队伍(3、4)
-		requirements[SeatEast] = SeatSouth // 1->3
-		requirements[SeatWest] = SeatNorth // 2->4
+		// Note: For Double Down, return assignments will be determined after card selection
+		requirements[first] = third   // 1->3 (initial assignment)
+		requirements[second] = fourth // 2->4 (initial assignment)
 	case TributeScenarioSingleLast:
 		// 第一名(1)还给最后一名(4)
-		requirements[SeatEast] = SeatNorth // 1->4
+		requirements[first] = fourth // 1->4
 	case TributeScenarioPartnerLast:
 		// 第一名(1)还给第三名(3)
-		requirements[SeatEast] = SeatSouth // 1->3
+		requirements[first] = third // 1->3
 	}
 
 	return requirements
@@ -385,4 +423,96 @@ func GetAvailableTributeCards(givenTributes map[SeatID]Card, scenario TributeSce
 		cards = append(cards, card)
 	}
 	return cards
+}
+
+// PrepareDoubleDownSelection 准备Double Down场景的卡牌选择
+func (ti *TributeInfo) PrepareDoubleDownSelection(lastRankings []SeatID) {
+	if ti.Scenario != TributeScenarioDoubleDown || len(lastRankings) != 4 {
+		return
+	}
+	
+	third := lastRankings[2]
+	fourth := lastRankings[3]
+	
+	// 将已给出的贡牌移到可选择列表
+	if card, exists := ti.GivenTributes[third]; exists {
+		ti.AvailableCards[third] = card
+	}
+	if card, exists := ti.GivenTributes[fourth]; exists {
+		ti.AvailableCards[fourth] = card
+	}
+	
+	ti.Phase = TributePhaseSelection
+}
+
+// SelectTributeCardForDoubleDown Player 1在Double Down场景中选择贡牌
+func (ti *TributeInfo) SelectTributeCardForDoubleDown(giver SeatID, lastRankings []SeatID) error {
+	if ti.Scenario != TributeScenarioDoubleDown || len(lastRankings) != 4 {
+		return fmt.Errorf("not a Double Down scenario")
+	}
+	
+	if ti.Phase != TributePhaseSelection {
+		return fmt.Errorf("not in selection phase")
+	}
+	
+	first := lastRankings[0]
+	second := lastRankings[1]
+	third := lastRankings[2]
+	fourth := lastRankings[3]
+	
+	// 检查是否是有效的贡牌者
+	if giver != third && giver != fourth {
+		return fmt.Errorf("invalid giver for selection")
+	}
+	
+	// 检查卡牌是否可选
+	selectedCard, exists := ti.AvailableCards[giver]
+	if !exists {
+		return fmt.Errorf("no card available from giver %s", giver.String())
+	}
+	
+	// Player 1 选择这张牌
+	ti.SelectedCards[first] = selectedCard
+	ti.ActualReceivers[giver] = first
+	
+	// Player 2 自动获得剩余的牌
+	var remainingGiver SeatID
+	if giver == third {
+		remainingGiver = fourth
+	} else {
+		remainingGiver = third
+	}
+	
+	if card, exists := ti.AvailableCards[remainingGiver]; exists {
+		ti.SelectedCards[second] = card
+		ti.ActualReceivers[remainingGiver] = second
+	}
+	
+	// 清空可选卡牌列表
+	ti.AvailableCards = make(map[SeatID]Card)
+	
+	// 更新还贡要求基于实际分配
+	ti.ReturnRequests = make(map[SeatID]SeatID)
+	// 根据实际接收情况设置还贡要求
+	for giver, receiver := range ti.ActualReceivers {
+		ti.ReturnRequests[receiver] = giver // receiver 还给 giver
+	}
+	
+	// 转到还贡阶段
+	ti.Phase = TributePhaseReturning
+	
+	return nil
+}
+
+// IsSelectionRequired 检查是否需要进行卡牌选择
+func (ti *TributeInfo) IsSelectionRequired() bool {
+	return ti.Scenario == TributeScenarioDoubleDown && !ti.HasImmunity && ti.Phase == TributePhaseSelection
+}
+
+// IsSelectionComplete 检查选择是否完成
+func (ti *TributeInfo) IsSelectionComplete() bool {
+	if ti.Scenario != TributeScenarioDoubleDown {
+		return true // 非Double Down场景不需要选择
+	}
+	return len(ti.SelectedCards) == 2 // Double Down需要选择2张卡
 }

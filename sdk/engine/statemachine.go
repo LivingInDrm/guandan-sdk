@@ -15,6 +15,7 @@ const (
 	PhaseCardsDealt
 	PhaseTrumpDecision
 	PhaseTribute
+	PhaseTributeSelection  // Double Down 卡牌选择阶段
 	PhaseReturnTribute
 	PhaseFirstPlay
 	PhaseInProgress
@@ -34,6 +35,8 @@ func (p DealPhase) String() string {
 		return "TrumpDecision"
 	case PhaseTribute:
 		return "Tribute"
+	case PhaseTributeSelection:
+		return "TributeSelection"
 	case PhaseReturnTribute:
 		return "ReturnTribute"
 	case PhaseFirstPlay:
@@ -289,15 +292,102 @@ func (sm *DealStateMachine) GiveTribute(from, to domain.SeatID, cards []domain.C
 	// 检查是否所有贡牌都已完成
 	if sm.dealCtx.TributeInfo.IsTributeComplete() {
 		sm.dealCtx.TributeInfo.Phase = domain.TributePhaseGiving
+		
+		// Double Down场景需要进入选择阶段
+		if sm.dealCtx.TributeInfo.Scenario == domain.TributeScenarioDoubleDown {
+			return sm.StartTributeSelection()
+		}
+		
 		return sm.StartReturnTribute()
 	}
 	
 	return nil
 }
 
+// StartTributeSelection 开始Double Down贡牌选择阶段
+func (sm *DealStateMachine) StartTributeSelection() error {
+	if sm.currentPhase != PhaseTribute {
+		return fmt.Errorf("cannot start tribute selection from phase %s", sm.currentPhase.String())
+	}
+	
+	if sm.dealCtx.TributeInfo.Scenario != domain.TributeScenarioDoubleDown {
+		return fmt.Errorf("tribute selection only available for Double Down scenario")
+	}
+	
+	// 准备选择阶段
+	sm.dealCtx.TributeInfo.PrepareDoubleDownSelection(sm.dealCtx.LastRankings)
+	sm.currentPhase = PhaseTributeSelection
+	
+	// 发布选择请求事件
+	first := sm.dealCtx.LastRankings[0]
+	sm.eventBus.Publish(event.NewTributeSelectionRequestedEvent(
+		sm.matchCtx.ID,
+		first,
+		sm.dealCtx.TributeInfo.AvailableCards,
+	))
+	
+	return nil
+}
+
+// SelectTributeCard Player 1在Double Down场景中选择贡牌
+func (sm *DealStateMachine) SelectTributeCard(giver domain.SeatID) error {
+	if sm.currentPhase != PhaseTributeSelection {
+		return fmt.Errorf("cannot select tribute card from phase %s", sm.currentPhase.String())
+	}
+	
+	if sm.dealCtx.TributeInfo.Scenario != domain.TributeScenarioDoubleDown {
+		return fmt.Errorf("tribute selection only available for Double Down scenario")
+	}
+	
+	// 获取选择前的信息，用于事件发布
+	selectedCard := sm.dealCtx.TributeInfo.AvailableCards[giver]
+	first := sm.dealCtx.LastRankings[0]
+	second := sm.dealCtx.LastRankings[1]
+	third := sm.dealCtx.LastRankings[2]
+	fourth := sm.dealCtx.LastRankings[3]
+	
+	var remainingGiver domain.SeatID
+	if giver == third {
+		remainingGiver = fourth
+	} else {
+		remainingGiver = third
+	}
+	remainingCard := sm.dealCtx.TributeInfo.AvailableCards[remainingGiver]
+	
+	// 执行选择
+	err := sm.dealCtx.TributeInfo.SelectTributeCardForDoubleDown(giver, sm.dealCtx.LastRankings)
+	if err != nil {
+		return fmt.Errorf("failed to select tribute card: %w", err)
+	}
+	
+	// 实际进行卡牌交换
+	firstPlayer := sm.matchCtx.GetPlayer(first)
+	secondPlayer := sm.matchCtx.GetPlayer(second)
+	
+	if firstPlayer != nil {
+		firstPlayer.AddCards([]domain.Card{selectedCard})
+	}
+	if secondPlayer != nil {
+		secondPlayer.AddCards([]domain.Card{remainingCard})
+	}
+	
+	// 发布选择完成事件
+	sm.eventBus.Publish(event.NewTributeCardSelectedEvent(
+		sm.matchCtx.ID,
+		first,
+		giver,
+		selectedCard,
+		second,
+		remainingCard,
+	))
+	
+	// 转到还贡阶段
+	return sm.StartReturnTribute()
+}
+
 // StartReturnTribute 开始还贡阶段
 func (sm *DealStateMachine) StartReturnTribute() error {
-	if sm.currentPhase != PhaseTribute {
+	if sm.currentPhase != PhaseTribute && sm.currentPhase != PhaseTributeSelection {
 		return fmt.Errorf("cannot start return tribute from phase %s", sm.currentPhase.String())
 	}
 	

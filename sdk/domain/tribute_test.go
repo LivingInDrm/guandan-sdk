@@ -89,14 +89,14 @@ func TestTributeScenarios(t *testing.T) {
 			}
 
 			// 测试immunity检查
-			immunity := CheckTributeImmunity(scenario, tc.playerBigJokers)
+			immunity := CheckTributeImmunity(scenario, tc.playerBigJokers, tc.lastRankings)
 			if immunity != tc.expectedImmunity {
 				t.Errorf("Expected immunity %v, got %v", tc.expectedImmunity, immunity)
 			}
 
 			// 测试tribute要求计算
 			if !immunity {
-				tributes := CalculateTributeRequirements(scenario)
+				tributes := CalculateTributeRequirements(scenario, tc.lastRankings)
 				if len(tributes) != len(tc.expectedTributes) {
 					t.Errorf("Expected %d tributes, got %d", len(tc.expectedTributes), len(tributes))
 				}
@@ -288,13 +288,13 @@ func TestTributePhaseIntegration(t *testing.T) {
 		}
 
 		// 2. Immunity检查
-		immunity := CheckTributeImmunity(scenario, playerBigJokers)
+		immunity := CheckTributeImmunity(scenario, playerBigJokers, lastRankings)
 		if immunity {
 			t.Error("Should not have immunity with only 1 big joker")
 		}
 
 		// 3. 计算tribute要求
-		tributes := CalculateTributeRequirements(scenario)
+		tributes := CalculateTributeRequirements(scenario, lastRankings)
 		expectedTributes := map[SeatID]SeatID{
 			SeatSouth: SeatEast, // 3->1
 			SeatNorth: SeatWest, // 4->2
@@ -310,4 +310,237 @@ func TestTributePhaseIntegration(t *testing.T) {
 		// 这部分需要在实际的状态机中测试
 		t.Log("Tribute flow validation completed")
 	})
+}
+
+func TestP3DoubleDownSelectionFlow(t *testing.T) {
+	t.Run("Double Down card selection process", func(t *testing.T) {
+		// 模拟 Double Down 场景: East&West(1&2) vs South&North(3&4)
+		lastRankings := []SeatID{SeatEast, SeatWest, SeatSouth, SeatNorth}
+		playerBigJokers := map[SeatID]int{
+			SeatSouth: 1, SeatNorth: 0, // 败方队伍合计1张大王，无immunity
+		}
+
+		// 1. 确认场景和immunity
+		scenario := DetermineTributeScenario(lastRankings)
+		if scenario != TributeScenarioDoubleDown {
+			t.Fatalf("Expected DoubleDown scenario, got %v", scenario)
+		}
+
+		immunity := CheckTributeImmunity(scenario, playerBigJokers, lastRankings)
+		if immunity {
+			t.Fatal("Should not have immunity")
+		}
+
+		// 2. 创建贡牌信息
+		tributeInfo := NewTributeInfo(scenario, immunity)
+		
+		// 设置贡牌要求
+		tributeRequests := CalculateTributeRequirements(scenario, lastRankings)
+		for from, to := range tributeRequests {
+			tributeInfo.TributeRequests[from] = to
+		}
+
+		// 3. 模拟贡牌过程
+		// Player 3 (SeatSouth) 给出贡牌
+		card3 := NewCard(Spades, King) // 假设这是3号玩家的最大牌
+		tributeInfo.GivenTributes[SeatSouth] = card3
+
+		// Player 4 (SeatNorth) 给出贡牌  
+		card4 := NewCard(Clubs, Queen) // 假设这是4号玩家的最大牌
+		tributeInfo.GivenTributes[SeatNorth] = card4
+
+		// 4. 验证贡牌完成后进入选择阶段
+		if !tributeInfo.IsTributeComplete() {
+			t.Fatal("Tribute should be complete")
+		}
+
+		// 5. 准备Double Down选择
+		tributeInfo.PrepareDoubleDownSelection(lastRankings)
+		
+		if tributeInfo.Phase != TributePhaseSelection {
+			t.Errorf("Expected Selection phase, got %v", tributeInfo.Phase)
+		}
+
+		// 验证可选卡牌
+		if len(tributeInfo.AvailableCards) != 2 {
+			t.Errorf("Expected 2 available cards, got %d", len(tributeInfo.AvailableCards))
+		}
+
+		// 6. Player 1 选择卡牌 (选择来自Player 3的牌)
+		err := tributeInfo.SelectTributeCardForDoubleDown(SeatSouth, lastRankings)
+		if err != nil {
+			t.Fatalf("Failed to select tribute card: %v", err)
+		}
+
+		// 7. 验证选择结果
+		// Player 1 (SeatEast) 应该得到来自Player 3的牌
+		if selectedCard, exists := tributeInfo.SelectedCards[SeatEast]; !exists || selectedCard != card3 {
+			t.Errorf("Player 1 should have selected card from Player 3")
+		}
+
+		// Player 2 (SeatWest) 应该得到来自Player 4的牌  
+		if selectedCard, exists := tributeInfo.SelectedCards[SeatWest]; !exists || selectedCard != card4 {
+			t.Errorf("Player 2 should have received card from Player 4")
+		}
+
+		// 8. 验证还贡要求基于实际分配
+		expectedReturnRequests := map[SeatID]SeatID{
+			SeatEast: SeatSouth, // Player 1 还给 Player 3 (实际提供牌的人)
+			SeatWest: SeatNorth, // Player 2 还给 Player 4 (实际提供牌的人)
+		}
+
+		for from, to := range expectedReturnRequests {
+			if tributeInfo.ReturnRequests[from] != to {
+				t.Errorf("Expected return %v->%v, got %v->%v", from, to, from, tributeInfo.ReturnRequests[from])
+			}
+		}
+
+		// 9. 验证阶段转换
+		if tributeInfo.Phase != TributePhaseReturning {
+			t.Errorf("Expected Returning phase, got %v", tributeInfo.Phase)
+		}
+	})
+}
+
+func TestP3ImmunityConditions(t *testing.T) {
+	testCases := []struct {
+		name            string
+		scenario        TributeScenario
+		lastRankings    []SeatID
+		playerBigJokers map[SeatID]int
+		expectedImmunity bool
+		description     string
+	}{
+		{
+			name:         "Double Down - immunity with 2 Big Jokers combined",
+			scenario:     TributeScenarioDoubleDown,
+			lastRankings: []SeatID{SeatEast, SeatWest, SeatSouth, SeatNorth}, // 1&2 vs 3&4
+			playerBigJokers: map[SeatID]int{
+				SeatSouth: 1, SeatNorth: 1, // 3+4合计2张大王
+			},
+			expectedImmunity: true,
+			description:     "败方队伍(3+4)合计握两张大王时有免疫",
+		},
+		{
+			name:         "Double Down - no immunity with only 1 Big Joker",
+			scenario:     TributeScenarioDoubleDown,
+			lastRankings: []SeatID{SeatEast, SeatWest, SeatSouth, SeatNorth},
+			playerBigJokers: map[SeatID]int{
+				SeatSouth: 1, SeatNorth: 0, // 3+4合计1张大王
+			},
+			expectedImmunity: false,
+			description:     "败方队伍(3+4)合计1张大王时无免疫",
+		},
+		{
+			name:         "Single Last - immunity with 2 Big Jokers alone",
+			scenario:     TributeScenarioSingleLast,
+			lastRankings: []SeatID{SeatEast, SeatSouth, SeatWest, SeatNorth}, // 1&3 vs 2&4
+			playerBigJokers: map[SeatID]int{
+				SeatNorth: 2, // 4单独握2张大王
+			},
+			expectedImmunity: true,
+			description:     "最后一名(4)单独握两张大王时有免疫",
+		},
+		{
+			name:         "Single Last - no immunity with only 1 Big Joker",
+			scenario:     TributeScenarioSingleLast,
+			lastRankings: []SeatID{SeatEast, SeatSouth, SeatWest, SeatNorth},
+			playerBigJokers: map[SeatID]int{
+				SeatNorth: 1, // 4单独握1张大王
+			},
+			expectedImmunity: false,
+			description:     "最后一名(4)单独握1张大王时无免疫",
+		},
+		{
+			name:         "Partner Last - immunity with 2 Big Jokers alone",
+			scenario:     TributeScenarioPartnerLast,
+			lastRankings: []SeatID{SeatEast, SeatNorth, SeatSouth, SeatWest}, // 1&4 vs 2&3
+			playerBigJokers: map[SeatID]int{
+				SeatSouth: 2, // 3单独握2张大王
+			},
+			expectedImmunity: true,
+			description:     "第三名(3)单独握两张大王时有免疫",
+		},
+		{
+			name:         "Partner Last - no immunity with only 1 Big Joker",
+			scenario:     TributeScenarioPartnerLast,
+			lastRankings: []SeatID{SeatEast, SeatNorth, SeatSouth, SeatWest},
+			playerBigJokers: map[SeatID]int{
+				SeatSouth: 1, // 3单独握1张大王
+			},
+			expectedImmunity: false,
+			description:     "第三名(3)单独握1张大王时无免疫",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			immunity := CheckTributeImmunity(tc.scenario, tc.playerBigJokers, tc.lastRankings)
+			if immunity != tc.expectedImmunity {
+				t.Errorf("Expected immunity %v, got %v. %s", tc.expectedImmunity, immunity, tc.description)
+			}
+		})
+	}
+}
+
+func TestP3DifferentSeatArrangements(t *testing.T) {
+	// 测试不同座位安排下的贡牌逻辑是否正确
+	testCases := []struct {
+		name             string
+		lastRankings     []SeatID
+		expectedScenario TributeScenario
+		expectedTributes map[SeatID]SeatID
+		description      string
+	}{
+		{
+			name:             "Double Down - East West first, South North last",
+			lastRankings:     []SeatID{SeatEast, SeatWest, SeatSouth, SeatNorth}, // EastWest(1&2) vs SouthNorth(3&4)
+			expectedScenario: TributeScenarioDoubleDown,
+			expectedTributes: map[SeatID]SeatID{
+				SeatSouth: SeatEast, // 3->1
+				SeatNorth: SeatWest, // 4->2
+			},
+			description: "测试EastWest队伍获胜时的贡牌分配",
+		},
+		{
+			name:             "Single Last - South North vs East West",
+			lastRankings:     []SeatID{SeatSouth, SeatEast, SeatNorth, SeatWest}, // South&North vs East&West
+			expectedScenario: TributeScenarioSingleLast,
+			expectedTributes: map[SeatID]SeatID{
+				SeatWest: SeatSouth, // 4->1
+			},
+			description: "测试不同座位组合的Single Last场景",
+		},
+		{
+			name:             "Partner Last - East South vs North West",
+			lastRankings:     []SeatID{SeatEast, SeatNorth, SeatSouth, SeatWest}, // East&West vs South&North, 1&4 vs 2&3
+			expectedScenario: TributeScenarioPartnerLast,
+			expectedTributes: map[SeatID]SeatID{
+				SeatSouth: SeatEast, // 3->1
+			},
+			description: "测试Partner Last场景：1&4 vs 2&3",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			// 确认场景识别正确
+			scenario := DetermineTributeScenario(tc.lastRankings)
+			if scenario != tc.expectedScenario {
+				t.Errorf("Expected scenario %v, got %v", tc.expectedScenario, scenario)
+			}
+
+			// 确认贡牌要求正确
+			tributes := CalculateTributeRequirements(scenario, tc.lastRankings)
+			if len(tributes) != len(tc.expectedTributes) {
+				t.Errorf("Expected %d tributes, got %d", len(tc.expectedTributes), len(tributes))
+			}
+
+			for from, to := range tc.expectedTributes {
+				if tributes[from] != to {
+					t.Errorf("Expected tribute %v->%v, got %v->%v. %s", from, to, from, tributes[from], tc.description)
+				}
+			}
+		})
+	}
 }

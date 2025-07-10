@@ -260,19 +260,19 @@ func (d *DealCtx) InitializeTribute(playerBigJokers map[SeatID]int) *DealCtx {
 	}
 
 	scenario := DetermineTributeScenario(d.LastRankings)
-	hasImmunity := CheckTributeImmunity(scenario, playerBigJokers)
+	hasImmunity := CheckTributeImmunity(scenario, playerBigJokers, d.LastRankings)
 	
 	tributeInfo := NewTributeInfo(scenario, hasImmunity)
 	
 	if !hasImmunity {
 		// 设置贡牌要求
-		tributeRequests := CalculateTributeRequirements(scenario)
+		tributeRequests := CalculateTributeRequirements(scenario, d.LastRankings)
 		for from, to := range tributeRequests {
 			tributeInfo.TributeRequests[from] = to
 		}
 		
 		// 设置还贡要求
-		returnRequests := CalculateReturnRequirements(scenario)
+		returnRequests := CalculateReturnRequirements(scenario, d.LastRankings)
 		for from, to := range returnRequests {
 			tributeInfo.ReturnRequests[from] = to
 		}

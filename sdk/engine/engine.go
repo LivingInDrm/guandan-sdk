@@ -111,11 +111,11 @@ func (ge *GameEngine) DealCards() error {
 func (ge *GameEngine) DetermineTrump() error {
 	ge.mu.Lock()
 	defer ge.mu.Unlock()
-
+	
 	if !ge.isInitialized {
 		return fmt.Errorf("engine not initialized")
 	}
-
+	
 	return ge.stateMachine.DetermineTrump()
 }
 
@@ -143,6 +143,17 @@ func (ge *GameEngine) GiveTribute(from, to domain.SeatID, cards []domain.Card) e
 	}
 	
 	return ge.stateMachine.GiveTribute(from, to, cards)
+}
+
+func (ge *GameEngine) SelectTributeCard(giver domain.SeatID) error {
+	ge.mu.Lock()
+	defer ge.mu.Unlock()
+	
+	if !ge.isInitialized {
+		return fmt.Errorf("engine not initialized")
+	}
+	
+	return ge.stateMachine.SelectTributeCard(giver)
 }
 
 func (ge *GameEngine) GiveReturnTribute(from, to domain.SeatID, cards []domain.Card) error {
