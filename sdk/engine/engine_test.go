@@ -104,7 +104,7 @@ func TestGameEngineFullDealFlow(t *testing.T) {
 		t.Errorf("Failed to initialize engine: %v", err)
 	}
 	
-	err = engine.StartDeal(1, domain.Two, domain.SeatEast)
+	err = engine.StartDeal(1, domain.SeatEast)
 	if err != nil {
 		t.Errorf("Failed to start deal: %v", err)
 	}
@@ -127,6 +127,11 @@ func TestGameEngineFullDealFlow(t *testing.T) {
 		if len(hand) != 27 {
 			t.Errorf("Expected 27 cards in hand for seat %s, got %d", seat, len(hand))
 		}
+	}
+	
+	err = engine.DetermineTrump()
+	if err != nil {
+		t.Errorf("Failed to determine trump: %v", err)
 	}
 	
 	err = engine.StartTribute()
@@ -167,7 +172,7 @@ func TestGameEnginePlayCards(t *testing.T) {
 		t.Errorf("Failed to initialize engine: %v", err)
 	}
 	
-	err = engine.StartDeal(1, domain.Two, domain.SeatEast)
+	err = engine.StartDeal(1, domain.SeatEast)
 	if err != nil {
 		t.Errorf("Failed to start deal: %v", err)
 	}
@@ -175,6 +180,11 @@ func TestGameEnginePlayCards(t *testing.T) {
 	err = engine.DealCards()
 	if err != nil {
 		t.Errorf("Failed to deal cards: %v", err)
+	}
+	
+	err = engine.DetermineTrump()
+	if err != nil {
+		t.Errorf("Failed to determine trump: %v", err)
 	}
 	
 	err = engine.StartTribute()
@@ -234,7 +244,7 @@ func TestGameEnginePass(t *testing.T) {
 		t.Errorf("Failed to initialize engine: %v", err)
 	}
 	
-	err = engine.StartDeal(1, domain.Two, domain.SeatEast)
+	err = engine.StartDeal(1, domain.SeatEast)
 	if err != nil {
 		t.Errorf("Failed to start deal: %v", err)
 	}
@@ -242,6 +252,11 @@ func TestGameEnginePass(t *testing.T) {
 	err = engine.DealCards()
 	if err != nil {
 		t.Errorf("Failed to deal cards: %v", err)
+	}
+	
+	err = engine.DetermineTrump()
+	if err != nil {
+		t.Errorf("Failed to determine trump: %v", err)
 	}
 	
 	err = engine.StartTribute()
@@ -280,7 +295,7 @@ func TestGameEngineInvalidActions(t *testing.T) {
 	eventBus := event.NewEventBus(100)
 	engine := NewGameEngine(eventBus)
 	
-	err := engine.StartDeal(1, domain.Two, domain.SeatEast)
+	err := engine.StartDeal(1, domain.SeatEast)
 	if err == nil {
 		t.Error("Should not be able to start deal on uninitialized engine")
 	}
@@ -320,7 +335,7 @@ func TestGameEngineInvalidActions(t *testing.T) {
 	
 	err = engine.StartTribute()
 	if err == nil {
-		t.Error("Should not be able to start tribute before dealing cards")
+		t.Error("Should not be able to start tribute before determining trump")
 	}
 	
 	err = engine.PlayCards(domain.SeatEast, []domain.Card{})
@@ -346,7 +361,7 @@ func TestGameEngineValidPlays(t *testing.T) {
 		t.Errorf("Failed to initialize engine: %v", err)
 	}
 	
-	err = engine.StartDeal(1, domain.Two, domain.SeatEast)
+	err = engine.StartDeal(1, domain.SeatEast)
 	if err != nil {
 		t.Errorf("Failed to start deal: %v", err)
 	}
@@ -354,6 +369,11 @@ func TestGameEngineValidPlays(t *testing.T) {
 	err = engine.DealCards()
 	if err != nil {
 		t.Errorf("Failed to deal cards: %v", err)
+	}
+	
+	err = engine.DetermineTrump()
+	if err != nil {
+		t.Errorf("Failed to determine trump: %v", err)
 	}
 	
 	err = engine.StartTribute()
@@ -392,7 +412,7 @@ func TestGameEnginePlayerTurn(t *testing.T) {
 		t.Errorf("Failed to initialize engine: %v", err)
 	}
 	
-	err = engine.StartDeal(1, domain.Two, domain.SeatEast)
+	err = engine.StartDeal(1, domain.SeatEast)
 	if err != nil {
 		t.Errorf("Failed to start deal: %v", err)
 	}
@@ -400,6 +420,11 @@ func TestGameEnginePlayerTurn(t *testing.T) {
 	err = engine.DealCards()
 	if err != nil {
 		t.Errorf("Failed to deal cards: %v", err)
+	}
+	
+	err = engine.DetermineTrump()
+	if err != nil {
+		t.Errorf("Failed to determine trump: %v", err)
 	}
 	
 	err = engine.StartTribute()
@@ -449,7 +474,7 @@ func TestGameEngineActionPermissions(t *testing.T) {
 		t.Errorf("Failed to initialize engine: %v", err)
 	}
 	
-	err = engine.StartDeal(1, domain.Two, domain.SeatEast)
+	err = engine.StartDeal(1, domain.SeatEast)
 	if err != nil {
 		t.Errorf("Failed to start deal: %v", err)
 	}
@@ -457,6 +482,11 @@ func TestGameEngineActionPermissions(t *testing.T) {
 	err = engine.DealCards()
 	if err != nil {
 		t.Errorf("Failed to deal cards: %v", err)
+	}
+	
+	err = engine.DetermineTrump()
+	if err != nil {
+		t.Errorf("Failed to determine trump: %v", err)
 	}
 	
 	err = engine.StartTribute()
@@ -525,7 +555,7 @@ func TestGameEngineEventPublishing(t *testing.T) {
 		t.Errorf("Failed to initialize engine: %v", err)
 	}
 	
-	err = engine.StartDeal(1, domain.Two, domain.SeatEast)
+	err = engine.StartDeal(1, domain.SeatEast)
 	if err != nil {
 		t.Errorf("Failed to start deal: %v", err)
 	}

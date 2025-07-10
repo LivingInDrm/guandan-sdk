@@ -86,7 +86,7 @@ func (ge *GameEngine) GetTrickCtx() *domain.TrickCtx {
 	return ge.stateMachine.GetTrickCtx()
 }
 
-func (ge *GameEngine) StartDeal(dealNumber int, trump domain.Rank, firstPlayer domain.SeatID) error {
+func (ge *GameEngine) StartDeal(dealNumber int, firstPlayer domain.SeatID) error {
 	ge.mu.Lock()
 	defer ge.mu.Unlock()
 	
@@ -94,7 +94,7 @@ func (ge *GameEngine) StartDeal(dealNumber int, trump domain.Rank, firstPlayer d
 		return fmt.Errorf("engine not initialized")
 	}
 	
-	return ge.stateMachine.StartDeal(dealNumber, trump, firstPlayer)
+	return ge.stateMachine.StartDeal(dealNumber, firstPlayer)
 }
 
 func (ge *GameEngine) DealCards() error {
@@ -106,6 +106,17 @@ func (ge *GameEngine) DealCards() error {
 	}
 	
 	return ge.stateMachine.DealCards()
+}
+
+func (ge *GameEngine) DetermineTrump() error {
+	ge.mu.Lock()
+	defer ge.mu.Unlock()
+
+	if !ge.isInitialized {
+		return fmt.Errorf("engine not initialized")
+	}
+
+	return ge.stateMachine.DetermineTrump()
 }
 
 func (ge *GameEngine) StartTribute() error {

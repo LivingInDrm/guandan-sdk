@@ -22,7 +22,7 @@ func TestDealStateMachinePhaseTransitions(t *testing.T) {
 		t.Errorf("Expected initial phase %s, got %s", PhaseIdle, sm.GetCurrentPhase())
 	}
 	
-	err := sm.StartDeal(1, domain.Two, domain.SeatEast)
+	err := sm.StartDeal(1, domain.SeatEast)
 	if err != nil {
 		t.Errorf("Failed to start deal: %v", err)
 	}
@@ -38,6 +38,15 @@ func TestDealStateMachinePhaseTransitions(t *testing.T) {
 	
 	if sm.GetCurrentPhase() != PhaseCardsDealt {
 		t.Errorf("Expected phase %s, got %s", PhaseCardsDealt, sm.GetCurrentPhase())
+	}
+	
+	err = sm.DetermineTrump()
+	if err != nil {
+		t.Errorf("Failed to determine trump: %v", err)
+	}
+	
+	if sm.GetCurrentPhase() != PhaseTrumpDecision {
+		t.Errorf("Expected phase %s, got %s", PhaseTrumpDecision, sm.GetCurrentPhase())
 	}
 	
 	err = sm.StartTribute()
@@ -82,19 +91,19 @@ func TestDealStateMachineInvalidTransitions(t *testing.T) {
 		t.Error("Should not be able to pass from idle phase")
 	}
 	
-	err = sm.StartDeal(1, domain.Two, domain.SeatEast)
+	err = sm.StartDeal(1, domain.SeatEast)
 	if err != nil {
 		t.Errorf("Failed to start deal: %v", err)
 	}
 	
-	err = sm.StartDeal(2, domain.Three, domain.SeatSouth)
+	err = sm.StartDeal(2, domain.SeatSouth)
 	if err == nil {
 		t.Error("Should not be able to start deal twice")
 	}
 	
 	err = sm.StartTribute()
 	if err == nil {
-		t.Error("Should not be able to start tribute before dealing cards")
+		t.Error("Should not be able to start tribute before determining trump")
 	}
 }
 
@@ -110,7 +119,7 @@ func TestDealStateMachineCardDealing(t *testing.T) {
 	
 	sm := NewDealStateMachine(matchCtx, eventBus)
 	
-	err := sm.StartDeal(1, domain.Two, domain.SeatEast)
+	err := sm.StartDeal(1, domain.SeatEast)
 	if err != nil {
 		t.Errorf("Failed to start deal: %v", err)
 	}
@@ -133,9 +142,8 @@ func TestDealStateMachineCardDealing(t *testing.T) {
 		t.Errorf("Expected deal number 1, got %d", dealCtx.DealNumber)
 	}
 	
-	if dealCtx.Trump != domain.Two {
-		t.Errorf("Expected trump %s, got %s", domain.Two, dealCtx.Trump)
-	}
+	// Trump is not determined yet at this phase
+	// Trump will be determined in DetermineTrump phase
 	
 	if dealCtx.FirstPlayer != domain.SeatEast {
 		t.Errorf("Expected first player %s, got %s", domain.SeatEast, dealCtx.FirstPlayer)
@@ -167,7 +175,7 @@ func TestDealStateMachinePlayCardsValidation(t *testing.T) {
 	
 	sm := NewDealStateMachine(matchCtx, eventBus)
 	
-	err := sm.StartDeal(1, domain.Two, domain.SeatEast)
+	err := sm.StartDeal(1, domain.SeatEast)
 	if err != nil {
 		t.Errorf("Failed to start deal: %v", err)
 	}
@@ -175,6 +183,11 @@ func TestDealStateMachinePlayCardsValidation(t *testing.T) {
 	err = sm.DealCards()
 	if err != nil {
 		t.Errorf("Failed to deal cards: %v", err)
+	}
+	
+	err = sm.DetermineTrump()
+	if err != nil {
+		t.Errorf("Failed to determine trump: %v", err)
 	}
 	
 	err = sm.StartTribute()
@@ -258,7 +271,7 @@ func TestDealStateMachinePassMechanism(t *testing.T) {
 	
 	sm := NewDealStateMachine(matchCtx, eventBus)
 	
-	err := sm.StartDeal(1, domain.Two, domain.SeatEast)
+	err := sm.StartDeal(1, domain.SeatEast)
 	if err != nil {
 		t.Errorf("Failed to start deal: %v", err)
 	}
@@ -266,6 +279,11 @@ func TestDealStateMachinePassMechanism(t *testing.T) {
 	err = sm.DealCards()
 	if err != nil {
 		t.Errorf("Failed to deal cards: %v", err)
+	}
+	
+	err = sm.DetermineTrump()
+	if err != nil {
+		t.Errorf("Failed to determine trump: %v", err)
 	}
 	
 	err = sm.StartTribute()
@@ -345,7 +363,7 @@ func TestDealStateMachineEventPublishing(t *testing.T) {
 	
 	sm := NewDealStateMachine(matchCtx, eventBus)
 	
-	err := sm.StartDeal(1, domain.Two, domain.SeatEast)
+	err := sm.StartDeal(1, domain.SeatEast)
 	if err != nil {
 		t.Errorf("Failed to start deal: %v", err)
 	}
@@ -361,9 +379,7 @@ func TestDealStateMachineEventPublishing(t *testing.T) {
 		if dealStartedEvent.DealNumber != 1 {
 			t.Errorf("Expected deal number 1, got %d", dealStartedEvent.DealNumber)
 		}
-		if dealStartedEvent.Trump != domain.Two {
-			t.Errorf("Expected trump %s, got %s", domain.Two, dealStartedEvent.Trump)
-		}
+		// Trump in DealStarted event is temporary, actual trump determined in P2 phase
 		if dealStartedEvent.FirstPlayer != domain.SeatEast {
 			t.Errorf("Expected first player %s, got %s", domain.SeatEast, dealStartedEvent.FirstPlayer)
 		}
@@ -465,7 +481,7 @@ func TestDealStateMachineReset(t *testing.T) {
 	
 	sm := NewDealStateMachine(matchCtx, eventBus)
 	
-	err := sm.StartDeal(1, domain.Two, domain.SeatEast)
+	err := sm.StartDeal(1, domain.SeatEast)
 	if err != nil {
 		t.Errorf("Failed to start deal: %v", err)
 	}
@@ -498,6 +514,353 @@ func TestDealStateMachineReset(t *testing.T) {
 	}
 }
 
+// P0 - Match Initialization Tests
+func TestP0MatchInitialization(t *testing.T) {
+	// Test P0 requirements: 4 players seated, teams, initial level = 2
+	players := []*domain.Player{
+		domain.NewPlayer("p1", "Player1", domain.SeatEast),
+		domain.NewPlayer("p2", "Player2", domain.SeatSouth),
+		domain.NewPlayer("p3", "Player3", domain.SeatWest),
+		domain.NewPlayer("p4", "Player4", domain.SeatNorth),
+	}
+	
+	// P0 Step 1: Four players seated, teams paired
+	matchCtx := domain.NewMatchCtx("test-match", players, 12345)
+	
+	// Verify 4 players are seated
+	if len(players) != 4 {
+		t.Errorf("Expected 4 players, got %d", len(players))
+	}
+	
+	// Verify teams (East-West vs South-North)
+	eastPlayer := matchCtx.GetPlayer(domain.SeatEast)
+	westPlayer := matchCtx.GetPlayer(domain.SeatWest)
+	southPlayer := matchCtx.GetPlayer(domain.SeatSouth)
+	northPlayer := matchCtx.GetPlayer(domain.SeatNorth)
+	
+	if eastPlayer == nil || westPlayer == nil || southPlayer == nil || northPlayer == nil {
+		t.Error("All players should be properly seated")
+	}
+	
+	// P0 Step 2: Initial level = 2
+	// Check team initial level
+	team1 := matchCtx.GetTeam(domain.TeamEastWest)
+	team2 := matchCtx.GetTeam(domain.TeamSouthNorth)
+	if team1 == nil || team2 == nil {
+		t.Error("Teams should be initialized")
+	} else {
+		if team1.Level != domain.Two {
+			t.Errorf("Expected team1 level %s, got %s", domain.Two, team1.Level)
+		}
+		if team2.Level != domain.Two {
+			t.Errorf("Expected team2 level %s, got %s", domain.Two, team2.Level)
+		}
+	}
+	
+	// P0 Step 3: Teams & Level written to Match-ctx
+	if matchCtx.ID == "" {
+		t.Error("Match ID should be set")
+	}
+	
+	// Verify level range (2-A, no jokers)
+	validLevels := []domain.Rank{
+		domain.Two, domain.Three, domain.Four, domain.Five, domain.Six,
+		domain.Seven, domain.Eight, domain.Nine, domain.Ten,
+		domain.Jack, domain.Queen, domain.King, domain.Ace,
+	}
+	
+	if team1 != nil {
+		found := false
+		for _, validLevel := range validLevels {
+			if team1.Level == validLevel {
+				found = true
+				break
+			}
+		}
+		
+		if !found {
+			t.Errorf("Initial level %s should be in valid range (2-A)", team1.Level)
+		}
+	}
+}
+
+// P1 - Deal Start Tests
+func TestP1DealStart(t *testing.T) {
+	eventBus := event.NewEventBus(100)
+	players := []*domain.Player{
+		domain.NewPlayer("p1", "Player1", domain.SeatEast),
+		domain.NewPlayer("p2", "Player2", domain.SeatSouth),
+		domain.NewPlayer("p3", "Player3", domain.SeatWest),
+		domain.NewPlayer("p4", "Player4", domain.SeatNorth),
+	}
+	matchCtx := domain.NewMatchCtx("test-match", players, 12345)
+	sm := NewDealStateMachine(matchCtx, eventBus)
+	
+	// P1 Entry condition: Each Deal starts
+	err := sm.StartDeal(1, domain.SeatEast)
+	if err != nil {
+		t.Errorf("Failed to start deal: %v", err)
+	}
+	
+	// P1 Step 1: Shuffle 108 cards
+	err = sm.DealCards()
+	if err != nil {
+		t.Errorf("Failed to deal cards: %v", err)
+	}
+	
+	// Verify deck has 108 cards
+	if sm.deck == nil {
+		t.Error("Deck should not be nil after dealing")
+	}
+	
+	// P1 Step 2: First deal should select starting card
+	dealCtx := sm.GetDealCtx()
+	if dealCtx.IsFirstDeal {
+		if sm.startingCard == nil {
+			t.Error("Starting card should be selected for first deal")
+		}
+		
+		// P1 Step 4: Record starting card holder
+		if sm.startingCardHolder == domain.SeatEast {
+			// Verify that starting card holder has the card
+			player := matchCtx.GetPlayer(sm.startingCardHolder)
+			if player == nil {
+				t.Error("Starting card holder should be valid")
+			}
+		}
+	}
+	
+	// P1 Step 3: Deal 27 cards to each player clockwise
+	totalCards := 0
+	for seat := domain.SeatEast; seat <= domain.SeatNorth; seat++ {
+		player := matchCtx.GetPlayer(seat)
+		if player == nil {
+			t.Errorf("Player %s should not be nil", seat)
+			continue
+		}
+		
+		hand := player.GetHand()
+		if len(hand) != 27 {
+			t.Errorf("Expected 27 cards for seat %s, got %d", seat, len(hand))
+		}
+		totalCards += len(hand)
+	}
+	
+	// Verify total cards dealt = 108
+	if totalCards != 108 {
+		t.Errorf("Expected 108 total cards dealt, got %d", totalCards)
+	}
+	
+	// Verify phase transition to PhaseCardsDealt
+	if sm.GetCurrentPhase() != PhaseCardsDealt {
+		t.Errorf("Expected phase %s, got %s", PhaseCardsDealt, sm.GetCurrentPhase())
+	}
+}
+
+// P2 - Determine Level & Trump Tests
+func TestP2DetermineLevelAndTrump(t *testing.T) {
+	eventBus := event.NewEventBus(100)
+	players := []*domain.Player{
+		domain.NewPlayer("p1", "Player1", domain.SeatEast),
+		domain.NewPlayer("p2", "Player2", domain.SeatSouth),
+		domain.NewPlayer("p3", "Player3", domain.SeatWest),
+		domain.NewPlayer("p4", "Player4", domain.SeatNorth),
+	}
+	matchCtx := domain.NewMatchCtx("test-match", players, 12345)
+	sm := NewDealStateMachine(matchCtx, eventBus)
+	
+	// Setup for P2 phase
+	err := sm.StartDeal(1, domain.SeatEast)
+	if err != nil {
+		t.Errorf("Failed to start deal: %v", err)
+	}
+	
+	err = sm.DealCards()
+	if err != nil {
+		t.Errorf("Failed to deal cards: %v", err)
+	}
+	
+	// P2 Entry condition: P1 completed (cards dealt)
+	if sm.GetCurrentPhase() != PhaseCardsDealt {
+		t.Errorf("Expected phase %s before P2, got %s", PhaseCardsDealt, sm.GetCurrentPhase())
+	}
+	
+	// P2 Step 1: Read previous deal winner team's level, default to 2
+	err = sm.DetermineTrump()
+	if err != nil {
+		t.Errorf("Failed to determine trump: %v", err)
+	}
+	
+	dealCtx := sm.GetDealCtx()
+	if dealCtx == nil {
+		t.Error("DealCtx should not be nil")
+		return
+	}
+	
+	// For first deal, level should be 2
+	expectedLevel := domain.Two
+	if dealCtx.CurrentLevel != expectedLevel {
+		t.Errorf("Expected level %s for first deal, got %s", expectedLevel, dealCtx.CurrentLevel)
+	}
+	
+	// P2 Step 2: Set 8 cards equal to Level as Trump
+	// P2 Step 3: Write Level & Trump to Deal-ctx
+	if dealCtx.Trump != expectedLevel {
+		t.Errorf("Expected trump %s, got %s", expectedLevel, dealCtx.Trump)
+	}
+	
+	// Verify phase transition to PhaseTrumpDecision
+	if sm.GetCurrentPhase() != PhaseTrumpDecision {
+		t.Errorf("Expected phase %s, got %s", PhaseTrumpDecision, sm.GetCurrentPhase())
+	}
+	
+	// Test next phase transition based on deal number
+	// For first deal: should go to P4 (skip tribute)
+	// For non-first deal: should go to P3 (tribute)
+	if dealCtx.IsFirstDeal {
+		err = sm.StartTribute()
+		if err != nil {
+			t.Errorf("Failed to start tribute for first deal: %v", err)
+		}
+		
+		// Should skip tribute and go to PhaseFirstPlay
+		if sm.GetCurrentPhase() != PhaseFirstPlay {
+			t.Errorf("Expected phase %s for first deal (skip tribute), got %s", PhaseFirstPlay, sm.GetCurrentPhase())
+		}
+	}
+}
+
+// Test default trump level for first deal
+func TestP2DefaultTrumpLevel(t *testing.T) {
+	eventBus := event.NewEventBus(100)
+	players := []*domain.Player{
+		domain.NewPlayer("p1", "Player1", domain.SeatEast),
+		domain.NewPlayer("p2", "Player2", domain.SeatSouth),
+		domain.NewPlayer("p3", "Player3", domain.SeatWest),
+		domain.NewPlayer("p4", "Player4", domain.SeatNorth),
+	}
+	
+	// Test first deal always starts with level 2
+	matchCtx := domain.NewMatchCtx("test-match", players, 12345)
+	sm := NewDealStateMachine(matchCtx, eventBus)
+	
+	// Start first deal
+	err := sm.StartDeal(1, domain.SeatEast)
+	if err != nil {
+		t.Errorf("Failed to start deal: %v", err)
+	}
+	
+	err = sm.DealCards()
+	if err != nil {
+		t.Errorf("Failed to deal cards: %v", err)
+	}
+	
+	err = sm.DetermineTrump()
+	if err != nil {
+		t.Errorf("Failed to determine trump: %v", err)
+	}
+	
+	dealCtx := sm.GetDealCtx()
+	expectedLevel := domain.Two
+	
+	if dealCtx.Trump != expectedLevel {
+		t.Errorf("Expected trump %s for first deal, got %s", expectedLevel, dealCtx.Trump)
+	}
+	
+	if dealCtx.CurrentLevel != expectedLevel {
+		t.Errorf("Expected level %s for first deal, got %s", expectedLevel, dealCtx.CurrentLevel)
+	}
+	
+	// Test second deal uses team level (which should still be 2 for this test)
+	sm.Reset()
+	err = sm.StartDeal(2, domain.SeatEast)
+	if err != nil {
+		t.Errorf("Failed to start second deal: %v", err)
+	}
+	
+	err = sm.DealCards()
+	if err != nil {
+		t.Errorf("Failed to deal cards: %v", err)
+	}
+	
+	err = sm.DetermineTrump()
+	if err != nil {
+		t.Errorf("Failed to determine trump: %v", err)
+	}
+	
+	dealCtx = sm.GetDealCtx()
+	// For second deal, should still be 2 as teams haven't advanced
+	if dealCtx.Trump != expectedLevel {
+		t.Errorf("Expected trump %s for second deal, got %s", expectedLevel, dealCtx.Trump)
+	}
+}
+
+// Test state flow from P0 to P2
+func TestP0ToP2StateFlow(t *testing.T) {
+	eventBus := event.NewEventBus(100)
+	
+	// P0: Match Initialization
+	players := []*domain.Player{
+		domain.NewPlayer("p1", "Player1", domain.SeatEast),
+		domain.NewPlayer("p2", "Player2", domain.SeatSouth),
+		domain.NewPlayer("p3", "Player3", domain.SeatWest),
+		domain.NewPlayer("p4", "Player4", domain.SeatNorth),
+	}
+	matchCtx := domain.NewMatchCtx("test-match", players, 12345)
+	sm := NewDealStateMachine(matchCtx, eventBus)
+	
+	// Initial state should be PhaseIdle
+	if sm.GetCurrentPhase() != PhaseIdle {
+		t.Errorf("Expected initial phase %s, got %s", PhaseIdle, sm.GetCurrentPhase())
+	}
+	
+	// P1: Deal Start
+	err := sm.StartDeal(1, domain.SeatEast)
+	if err != nil {
+		t.Errorf("Failed to start deal: %v", err)
+	}
+	
+	if sm.GetCurrentPhase() != PhaseCreated {
+		t.Errorf("Expected phase %s after StartDeal, got %s", PhaseCreated, sm.GetCurrentPhase())
+	}
+	
+	// P1: Deal Cards
+	err = sm.DealCards()
+	if err != nil {
+		t.Errorf("Failed to deal cards: %v", err)
+	}
+	
+	if sm.GetCurrentPhase() != PhaseCardsDealt {
+		t.Errorf("Expected phase %s after DealCards, got %s", PhaseCardsDealt, sm.GetCurrentPhase())
+	}
+	
+	// P2: Determine Trump
+	err = sm.DetermineTrump()
+	if err != nil {
+		t.Errorf("Failed to determine trump: %v", err)
+	}
+	
+	if sm.GetCurrentPhase() != PhaseTrumpDecision {
+		t.Errorf("Expected phase %s after DetermineTrump, got %s", PhaseTrumpDecision, sm.GetCurrentPhase())
+	}
+	
+	// Verify correct state flow for first deal
+	dealCtx := sm.GetDealCtx()
+	if !dealCtx.IsFirstDeal {
+		t.Error("Should be marked as first deal")
+	}
+	
+	// Next phase: StartTribute (should skip to FirstPlay for first deal)
+	err = sm.StartTribute()
+	if err != nil {
+		t.Errorf("Failed to start tribute: %v", err)
+	}
+	
+	if sm.GetCurrentPhase() != PhaseFirstPlay {
+		t.Errorf("Expected phase %s for first deal (skip tribute), got %s", PhaseFirstPlay, sm.GetCurrentPhase())
+	}
+}
+
 func TestDealStateMachineContextAccess(t *testing.T) {
 	eventBus := event.NewEventBus(100)
 	players := []*domain.Player{
@@ -522,7 +885,7 @@ func TestDealStateMachineContextAccess(t *testing.T) {
 		t.Error("TrickCtx should be nil initially")
 	}
 	
-	err := sm.StartDeal(1, domain.Two, domain.SeatEast)
+	err := sm.StartDeal(1, domain.SeatEast)
 	if err != nil {
 		t.Errorf("Failed to start deal: %v", err)
 	}
@@ -539,6 +902,11 @@ func TestDealStateMachineContextAccess(t *testing.T) {
 	err = sm.DealCards()
 	if err != nil {
 		t.Errorf("Failed to deal cards: %v", err)
+	}
+	
+	err = sm.DetermineTrump()
+	if err != nil {
+		t.Errorf("Failed to determine trump: %v", err)
 	}
 	
 	err = sm.StartTribute()

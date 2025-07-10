@@ -86,6 +86,24 @@ func NewCardsDealtEvent(matchID domain.MatchID, hands map[domain.SeatID][]domain
 	}
 }
 
+type TrumpDeterminedEvent struct {
+	BaseEvent
+	CurrentLevel domain.Rank
+	Trump        domain.Rank
+}
+
+func NewTrumpDeterminedEvent(matchID domain.MatchID, currentLevel domain.Rank, trump domain.Rank) *TrumpDeterminedEvent {
+	return &TrumpDeterminedEvent{
+		BaseEvent: BaseEvent{
+			EventTypeName: "TrumpDetermined",
+			EventTime:     time.Now(),
+			MatchIDValue:  matchID,
+		},
+		CurrentLevel: currentLevel,
+		Trump:        trump,
+	}
+}
+
 type TributeRequestedEvent struct {
 	BaseEvent
 	RequiredTributes map[domain.SeatID]int

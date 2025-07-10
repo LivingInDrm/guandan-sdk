@@ -197,6 +197,18 @@ func (d *DealCtx) WithTributeGiven(given bool) *DealCtx {
 	return &newCtx
 }
 
+func (d *DealCtx) WithTrump(trump Rank) *DealCtx {
+	newCtx := *d
+	newCtx.Trump = trump
+	return &newCtx
+}
+
+func (d *DealCtx) WithCurrentLevel(level Rank) *DealCtx {
+	newCtx := *d
+	newCtx.CurrentLevel = level
+	return &newCtx
+}
+
 func (d *DealCtx) WithEndTime(endTime time.Time) *DealCtx {
 	newCtx := *d
 	newCtx.EndTime = &endTime

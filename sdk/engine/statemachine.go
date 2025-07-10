@@ -13,6 +13,7 @@ const (
 	PhaseIdle DealPhase = iota
 	PhaseCreated
 	PhaseCardsDealt
+	PhaseTrumpDecision
 	PhaseTribute
 	PhaseReturnTribute
 	PhaseFirstPlay
@@ -29,6 +30,8 @@ func (p DealPhase) String() string {
 		return "Created"
 	case PhaseCardsDealt:
 		return "CardsDealt"
+	case PhaseTrumpDecision:
+		return "TrumpDecision"
 	case PhaseTribute:
 		return "Tribute"
 	case PhaseReturnTribute:
@@ -53,6 +56,8 @@ type DealStateMachine struct {
 	trickCtx     *domain.TrickCtx
 	eventBus     *event.EventBus
 	deck         *domain.Deck
+	startingCard *domain.Card
+	startingCardHolder domain.SeatID
 }
 
 func NewDealStateMachine(matchCtx *domain.MatchCtx, eventBus *event.EventBus) *DealStateMachine {
@@ -79,18 +84,19 @@ func (sm *DealStateMachine) GetTrickCtx() *domain.TrickCtx {
 	return sm.trickCtx
 }
 
-func (sm *DealStateMachine) StartDeal(dealNumber int, trump domain.Rank, firstPlayer domain.SeatID) error {
+func (sm *DealStateMachine) StartDeal(dealNumber int, firstPlayer domain.SeatID) error {
 	if sm.currentPhase != PhaseIdle {
 		return fmt.Errorf("cannot start deal from phase %s", sm.currentPhase.String())
 	}
 	
-	sm.dealCtx = domain.NewDealCtx(dealNumber, trump, firstPlayer)
+	// Create deal context without trump - trump will be determined in P2 phase
+	sm.dealCtx = domain.NewDealCtx(dealNumber, domain.Two, firstPlayer) // Temporary trump
 	sm.currentPhase = PhaseCreated
 	
 	sm.eventBus.Publish(event.NewDealStartedEvent(
 		sm.matchCtx.ID,
 		dealNumber,
-		trump,
+		domain.Two, // Temporary trump
 		firstPlayer,
 	))
 	
@@ -105,6 +111,15 @@ func (sm *DealStateMachine) DealCards() error {
 	sm.deck = domain.NewDeckWithSeed(sm.matchCtx.Seed)
 	sm.deck.Shuffle()
 	
+	// P1 Step 2: Select starting card for first deal
+	if sm.dealCtx.IsFirstDeal {
+		// Randomly select a starting card from the deck
+		allCards := sm.deck.Cards
+		startingCardIndex := sm.matchCtx.Seed % int64(len(allCards))
+		sm.startingCard = &allCards[startingCardIndex]
+	}
+	
+	// P1 Step 3: Deal cards to each player (27 cards each)
 	hands := sm.deck.DealToHands(4)
 	handMap := make(map[domain.SeatID][]domain.Card)
 	
@@ -115,6 +130,16 @@ func (sm *DealStateMachine) DealCards() error {
 			player.ClearHand()
 			player.AddCards(hand)
 			handMap[seat] = hand
+			
+			// P1 Step 4: Record starting card holder for first deal
+			if sm.dealCtx.IsFirstDeal && sm.startingCard != nil {
+				for _, card := range hand {
+					if card.Rank == sm.startingCard.Rank && card.Suit == sm.startingCard.Suit {
+						sm.startingCardHolder = seat
+						break
+					}
+				}
+			}
 		}
 	}
 	
@@ -129,8 +154,44 @@ func (sm *DealStateMachine) DealCards() error {
 	return nil
 }
 
-func (sm *DealStateMachine) StartTribute() error {
+// DetermineTrump implements P2 phase - Determine Level & Trump
+func (sm *DealStateMachine) DetermineTrump() error {
 	if sm.currentPhase != PhaseCardsDealt {
+		return fmt.Errorf("cannot determine trump from phase %s", sm.currentPhase.String())
+	}
+
+	// P2 Step 1: Read previous deal winner team's level, default to 2 if none
+	var currentLevel domain.Rank = domain.Two
+	if sm.dealCtx.DealNumber > 1 {
+		// Get previous deal winner team's current level
+		// For now, we'll use team1's level as placeholder
+		// This should be updated based on previous deal results
+		team := sm.matchCtx.GetTeam(domain.TeamEastWest)
+		if team != nil {
+			currentLevel = team.Level
+		}
+	}
+
+	// P2 Step 2: Set 8 cards equal to Level as Trump
+	trump := currentLevel
+
+	// P2 Step 3: Write Level & Trump to Deal-ctx
+	sm.dealCtx = sm.dealCtx.WithTrump(trump)
+	sm.dealCtx = sm.dealCtx.WithCurrentLevel(currentLevel)
+
+	sm.currentPhase = PhaseTrumpDecision
+
+	sm.eventBus.Publish(event.NewTrumpDeterminedEvent(
+		sm.matchCtx.ID,
+		currentLevel,
+		trump,
+	))
+
+	return nil
+}
+
+func (sm *DealStateMachine) StartTribute() error {
+	if sm.currentPhase != PhaseTrumpDecision {
 		return fmt.Errorf("cannot start tribute from phase %s", sm.currentPhase.String())
 	}
 	
@@ -313,7 +374,7 @@ func (sm *DealStateMachine) GiveReturnTribute(from, to domain.SeatID, cards []do
 }
 
 func (sm *DealStateMachine) StartFirstPlay() error {
-	if sm.currentPhase != PhaseTribute && sm.currentPhase != PhaseReturnTribute && sm.currentPhase != PhaseCardsDealt {
+	if sm.currentPhase != PhaseTribute && sm.currentPhase != PhaseReturnTribute && sm.currentPhase != PhaseTrumpDecision {
 		return fmt.Errorf("cannot start first play from phase %s", sm.currentPhase.String())
 	}
 	
@@ -547,4 +608,6 @@ func (sm *DealStateMachine) Reset() {
 	sm.dealCtx = nil
 	sm.trickCtx = nil
 	sm.deck = nil
+	sm.startingCard = nil
+	sm.startingCardHolder = domain.SeatEast
 }
