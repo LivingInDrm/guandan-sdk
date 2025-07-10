@@ -134,6 +134,21 @@ func (ge *GameEngine) GiveTribute(from, to domain.SeatID, cards []domain.Card) e
 	return ge.stateMachine.GiveTribute(from, to, cards)
 }
 
+func (ge *GameEngine) GiveReturnTribute(from, to domain.SeatID, cards []domain.Card) error {
+	ge.mu.Lock()
+	defer ge.mu.Unlock()
+	
+	if !ge.isInitialized {
+		return fmt.Errorf("engine not initialized")
+	}
+	
+	if !ge.isActionAllowed(from, "return_tribute") {
+		return fmt.Errorf("return tribute action not allowed for player %s", from.String())
+	}
+	
+	return ge.stateMachine.GiveReturnTribute(from, to, cards)
+}
+
 func (ge *GameEngine) PlayCards(seat domain.SeatID, cards []domain.Card) error {
 	ge.mu.Lock()
 	defer ge.mu.Unlock()

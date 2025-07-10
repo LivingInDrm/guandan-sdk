@@ -103,6 +103,7 @@ const (
 	DealStateCreated DealState = iota
 	DealStateDealt
 	DealStateTribute
+	DealStateReturnTribute
 	DealStateFirstPlay
 	DealStateInProgress
 	DealStateFinished
@@ -116,6 +117,8 @@ func (s DealState) String() string {
 		return "Dealt"
 	case DealStateTribute:
 		return "Tribute"
+	case DealStateReturnTribute:
+		return "ReturnTribute"
 	case DealStateFirstPlay:
 		return "FirstPlay"
 	case DealStateInProgress:
@@ -128,18 +131,20 @@ func (s DealState) String() string {
 }
 
 type DealCtx struct {
-	DealNumber    int
-	State         DealState
-	Trump         Rank
-	CurrentLevel  Rank
-	StartTime     time.Time
-	EndTime       *time.Time
-	FirstPlayer   SeatID
-	RankList      []SeatID
-	TrickCount    int
-	IsFirstDeal   bool
-	TributeGiven  bool
-	TributeCards  map[SeatID][]Card
+	DealNumber     int
+	State          DealState
+	Trump          Rank
+	CurrentLevel   Rank
+	StartTime      time.Time
+	EndTime        *time.Time
+	FirstPlayer    SeatID
+	RankList       []SeatID
+	TrickCount     int
+	IsFirstDeal    bool
+	TributeGiven   bool
+	TributeCards   map[SeatID][]Card
+	LastRankings   []SeatID      // 上局排名，用于计算贡牌
+	TributeInfo    *TributeInfo  // 新的贡牌信息
 }
 
 func NewDealCtx(dealNumber int, trump Rank, firstPlayer SeatID) *DealCtx {
@@ -155,7 +160,16 @@ func NewDealCtx(dealNumber int, trump Rank, firstPlayer SeatID) *DealCtx {
 		IsFirstDeal:  dealNumber == 1,
 		TributeGiven: false,
 		TributeCards: make(map[SeatID][]Card),
+		LastRankings: nil,
+		TributeInfo:  nil,
 	}
+}
+
+// NewDealCtxWithHistory 创建带历史排名的DealCtx
+func NewDealCtxWithHistory(dealNumber int, trump Rank, firstPlayer SeatID, lastRankings []SeatID) *DealCtx {
+	ctx := NewDealCtx(dealNumber, trump, firstPlayer)
+	ctx.LastRankings = lastRankings
+	return ctx
 }
 
 func (d *DealCtx) WithState(state DealState) *DealCtx {
@@ -209,6 +223,54 @@ func (d *DealCtx) GetRankPosition(seat SeatID) int {
 		}
 	}
 	return 0
+}
+
+// WithTributeInfo 设置贡牌信息
+func (d *DealCtx) WithTributeInfo(tributeInfo *TributeInfo) *DealCtx {
+	newCtx := *d
+	newCtx.TributeInfo = tributeInfo
+	return &newCtx
+}
+
+// WithLastRankings 设置上局排名
+func (d *DealCtx) WithLastRankings(rankings []SeatID) *DealCtx {
+	newCtx := *d
+	newCtx.LastRankings = make([]SeatID, len(rankings))
+	copy(newCtx.LastRankings, rankings)
+	return &newCtx
+}
+
+// InitializeTribute 初始化贡牌系统
+func (d *DealCtx) InitializeTribute(playerBigJokers map[SeatID]int) *DealCtx {
+	if d.IsFirstDeal {
+		// 首局无需贡牌
+		return d.WithTributeInfo(NewTributeInfo(TributeScenarioNone, false))
+	}
+
+	scenario := DetermineTributeScenario(d.LastRankings)
+	hasImmunity := CheckTributeImmunity(scenario, playerBigJokers)
+	
+	tributeInfo := NewTributeInfo(scenario, hasImmunity)
+	
+	if !hasImmunity {
+		// 设置贡牌要求
+		tributeRequests := CalculateTributeRequirements(scenario)
+		for from, to := range tributeRequests {
+			tributeInfo.TributeRequests[from] = to
+		}
+		
+		// 设置还贡要求
+		returnRequests := CalculateReturnRequirements(scenario)
+		for from, to := range returnRequests {
+			tributeInfo.ReturnRequests[from] = to
+		}
+		
+		tributeInfo.Phase = TributePhaseRequested
+	} else {
+		tributeInfo.Phase = TributePhaseCompleted
+	}
+	
+	return d.WithTributeInfo(tributeInfo)
 }
 
 type TrickState int

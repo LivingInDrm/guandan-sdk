@@ -14,6 +14,7 @@ const (
 	PhaseCreated
 	PhaseCardsDealt
 	PhaseTribute
+	PhaseReturnTribute
 	PhaseFirstPlay
 	PhaseInProgress
 	PhaseRankList
@@ -30,6 +31,8 @@ func (p DealPhase) String() string {
 		return "CardsDealt"
 	case PhaseTribute:
 		return "Tribute"
+	case PhaseReturnTribute:
+		return "ReturnTribute"
 	case PhaseFirstPlay:
 		return "FirstPlay"
 	case PhaseInProgress:
@@ -135,7 +138,28 @@ func (sm *DealStateMachine) StartTribute() error {
 		return sm.skipTribute()
 	}
 	
-	tributeRequirements := sm.calculateTributeRequirements()
+	// 计算每个玩家的大王数量
+	playerBigJokers := make(map[domain.SeatID]int)
+	for seat := domain.SeatEast; seat <= domain.SeatNorth; seat++ {
+		player := sm.matchCtx.GetPlayer(seat)
+		if player != nil {
+			playerBigJokers[seat] = domain.CountBigJokers(player.GetHand())
+		}
+	}
+	
+	// 初始化贡牌系统
+	sm.dealCtx = sm.dealCtx.InitializeTribute(playerBigJokers)
+	
+	if sm.dealCtx.TributeInfo.HasImmunity {
+		// 有免疫，直接跳过贡牌
+		return sm.skipTribute()
+	}
+	
+	// 转换贡牌要求格式用于事件
+	tributeRequirements := make(map[domain.SeatID]int)
+	for from := range sm.dealCtx.TributeInfo.TributeRequests {
+		tributeRequirements[from] = 1 // 每人贡1张牌
+	}
 	
 	sm.dealCtx = sm.dealCtx.WithState(domain.DealStateTribute)
 	sm.currentPhase = PhaseTribute
@@ -158,6 +182,13 @@ func (sm *DealStateMachine) GiveTribute(from, to domain.SeatID, cards []domain.C
 		return fmt.Errorf("cannot give tribute from phase %s", sm.currentPhase.String())
 	}
 	
+	// 验证贡牌数量
+	if len(cards) != 1 {
+		return fmt.Errorf("must tribute exactly one card")
+	}
+	
+	card := cards[0]
+	
 	fromPlayer := sm.matchCtx.GetPlayer(from)
 	toPlayer := sm.matchCtx.GetPlayer(to)
 	
@@ -165,14 +196,27 @@ func (sm *DealStateMachine) GiveTribute(from, to domain.SeatID, cards []domain.C
 		return fmt.Errorf("invalid player seats")
 	}
 	
-	if !fromPlayer.HasCards(cards) {
-		return fmt.Errorf("player does not have required cards")
+	// 验证贡牌关系
+	expectedTo, exists := sm.dealCtx.TributeInfo.TributeRequests[from]
+	if !exists {
+		return fmt.Errorf("player %s is not required to give tribute", from.String())
+	}
+	if expectedTo != to {
+		return fmt.Errorf("player %s should give tribute to %s, not %s", from.String(), expectedTo.String(), to.String())
 	}
 	
+	// 验证贡牌是否符合规则（除了红桃trump外最大的牌）
+	if err := domain.ValidateTributeCard(fromPlayer.GetHand(), card, sm.dealCtx.Trump); err != nil {
+		return fmt.Errorf("invalid tribute card: %w", err)
+	}
+	
+	// 执行贡牌
 	fromPlayer.RemoveCards(cards)
 	toPlayer.AddCards(cards)
 	
+	// 记录贡牌
 	sm.dealCtx.TributeCards[from] = cards
+	sm.dealCtx.TributeInfo.GivenTributes[from] = card
 	
 	sm.eventBus.Publish(event.NewTributeGivenEvent(
 		sm.matchCtx.ID,
@@ -181,7 +225,86 @@ func (sm *DealStateMachine) GiveTribute(from, to domain.SeatID, cards []domain.C
 		cards,
 	))
 	
-	if sm.allTributesGiven() {
+	// 检查是否所有贡牌都已完成
+	if sm.dealCtx.TributeInfo.IsTributeComplete() {
+		sm.dealCtx.TributeInfo.Phase = domain.TributePhaseGiving
+		return sm.StartReturnTribute()
+	}
+	
+	return nil
+}
+
+// StartReturnTribute 开始还贡阶段
+func (sm *DealStateMachine) StartReturnTribute() error {
+	if sm.currentPhase != PhaseTribute {
+		return fmt.Errorf("cannot start return tribute from phase %s", sm.currentPhase.String())
+	}
+	
+	if sm.dealCtx.TributeInfo.HasImmunity || len(sm.dealCtx.TributeInfo.ReturnRequests) == 0 {
+		// 无需还贡，直接开始首次出牌
+		sm.dealCtx.TributeInfo.Phase = domain.TributePhaseCompleted
+		sm.dealCtx = sm.dealCtx.WithTributeGiven(true)
+		return sm.StartFirstPlay()
+	}
+	
+	sm.dealCtx = sm.dealCtx.WithState(domain.DealStateReturnTribute)
+	sm.currentPhase = PhaseReturnTribute
+	sm.dealCtx.TributeInfo.Phase = domain.TributePhaseReturning
+	
+	return nil
+}
+
+// GiveReturnTribute 执行还贡
+func (sm *DealStateMachine) GiveReturnTribute(from, to domain.SeatID, cards []domain.Card) error {
+	if sm.currentPhase != PhaseReturnTribute {
+		return fmt.Errorf("cannot give return tribute from phase %s", sm.currentPhase.String())
+	}
+	
+	// 验证还贡数量
+	if len(cards) != 1 {
+		return fmt.Errorf("must return exactly one card")
+	}
+	
+	card := cards[0]
+	
+	fromPlayer := sm.matchCtx.GetPlayer(from)
+	toPlayer := sm.matchCtx.GetPlayer(to)
+	
+	if fromPlayer == nil || toPlayer == nil {
+		return fmt.Errorf("invalid player seats")
+	}
+	
+	// 验证还贡关系
+	expectedTo, exists := sm.dealCtx.TributeInfo.ReturnRequests[from]
+	if !exists {
+		return fmt.Errorf("player %s is not required to give return tribute", from.String())
+	}
+	if expectedTo != to {
+		return fmt.Errorf("player %s should give return tribute to %s, not %s", from.String(), expectedTo.String(), to.String())
+	}
+	
+	// 验证还贡牌是否符合规则（点数<=10）
+	if !domain.IsValidReturnTributeCard(fromPlayer.GetHand(), card) {
+		return fmt.Errorf("invalid return tribute card: must be <= 10 points")
+	}
+	
+	// 执行还贡
+	fromPlayer.RemoveCards(cards)
+	toPlayer.AddCards(cards)
+	
+	// 记录还贡
+	sm.dealCtx.TributeInfo.ReturnedTributes[from] = card
+	
+	sm.eventBus.Publish(event.NewTributeGivenEvent(
+		sm.matchCtx.ID,
+		from,
+		to,
+		cards,
+	))
+	
+	// 检查是否所有还贡都已完成
+	if sm.dealCtx.TributeInfo.IsReturnComplete() {
+		sm.dealCtx.TributeInfo.Phase = domain.TributePhaseCompleted
 		sm.dealCtx = sm.dealCtx.WithTributeGiven(true)
 		return sm.StartFirstPlay()
 	}
@@ -190,7 +313,7 @@ func (sm *DealStateMachine) GiveTribute(from, to domain.SeatID, cards []domain.C
 }
 
 func (sm *DealStateMachine) StartFirstPlay() error {
-	if sm.currentPhase != PhaseTribute && sm.currentPhase != PhaseCardsDealt {
+	if sm.currentPhase != PhaseTribute && sm.currentPhase != PhaseReturnTribute && sm.currentPhase != PhaseCardsDealt {
 		return fmt.Errorf("cannot start first play from phase %s", sm.currentPhase.String())
 	}
 	
@@ -399,14 +522,24 @@ func (sm *DealStateMachine) shouldFinishMatch() bool {
 	return sm.dealCtx.CurrentLevel >= domain.Ace
 }
 
-func (sm *DealStateMachine) calculateTributeRequirements() map[domain.SeatID]int {
-	requirements := make(map[domain.SeatID]int)
+// GetTributeCardOptions 获取贡牌选项（调试用）
+func (sm *DealStateMachine) GetTributeCardOptions(seat domain.SeatID) []domain.Card {
+	player := sm.matchCtx.GetPlayer(seat)
+	if player == nil {
+		return nil
+	}
 	
-	return requirements
+	return domain.GetTributeCardCandidates(player.GetHand(), sm.dealCtx.Trump)
 }
 
-func (sm *DealStateMachine) allTributesGiven() bool {
-	return true
+// GetReturnTributeCardOptions 获取还贡选项
+func (sm *DealStateMachine) GetReturnTributeCardOptions(seat domain.SeatID) []domain.Card {
+	player := sm.matchCtx.GetPlayer(seat)
+	if player == nil {
+		return nil
+	}
+	
+	return domain.GetReturnTributeCardCandidates(player.GetHand())
 }
 
 func (sm *DealStateMachine) Reset() {
