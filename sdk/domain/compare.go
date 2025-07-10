@@ -134,7 +134,18 @@ func getGroupValue(group *CardGroup, trump Rank) int {
 		return getBombValue(group, trump)
 	}
 	
+	// 对于非炸弹类型，需要考虑王牌的特殊值
 	rank := group.Rank
+	
+	// 处理王牌（小王、大王）
+	if rank == SmallJoker {
+		return 1000
+	}
+	if rank == BigJoker {
+		return 1001
+	}
+	
+	// 处理主牌
 	if rank == trump {
 		return 500 + int(rank)
 	}

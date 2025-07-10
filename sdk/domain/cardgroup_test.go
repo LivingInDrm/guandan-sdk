@@ -364,3 +364,138 @@ func TestTripleStraightValidation(t *testing.T) {
 		})
 	}
 }
+
+// Additional edge case tests for CardGroup
+
+func TestCardGroupEdgeCases(t *testing.T) {
+	testCases := []struct {
+		name             string
+		cards            []Card
+		expectedCategory CardCategory
+		expectedValid    bool
+	}{
+		{
+			name:             "Single joker",
+			cards:            []Card{NewJoker(SmallJoker)},
+			expectedCategory: Single,
+			expectedValid:    true,
+		},
+		{
+			name:             "Big joker single",
+			cards:            []Card{NewJoker(BigJoker)},
+			expectedCategory: Single,
+			expectedValid:    true,
+		},
+		{
+			name:             "Mixed joker bomb",
+			cards:            []Card{NewJoker(SmallJoker), NewJoker(BigJoker), NewJoker(SmallJoker)},
+			expectedCategory: JokerBomb,
+			expectedValid:    true,
+		},
+		{
+			name:             "Four jokers bomb",
+			cards:            []Card{NewJoker(SmallJoker), NewJoker(BigJoker), NewJoker(SmallJoker), NewJoker(BigJoker)},
+			expectedCategory: JokerBomb,
+			expectedValid:    true,
+		},
+		{
+			name:             "Invalid mixed cards with jokers",
+			cards:            []Card{NewJoker(SmallJoker), NewCard(Hearts, Ace)},
+			expectedCategory: InvalidCategory,
+			expectedValid:    false,
+		},
+		{
+			name:             "Longest possible straight (A-K)",
+			cards:            []Card{
+				NewCard(Hearts, Ace), NewCard(Spades, Two), NewCard(Clubs, Three), 
+				NewCard(Diamonds, Four), NewCard(Hearts, Five), NewCard(Spades, Six),
+				NewCard(Clubs, Seven), NewCard(Diamonds, Eight), NewCard(Hearts, Nine),
+				NewCard(Spades, Ten), NewCard(Clubs, Jack), NewCard(Diamonds, Queen),
+				NewCard(Hearts, King),
+			},
+			expectedCategory: Straight,
+			expectedValid:    true,
+		},
+		{
+			name:             "Longest possible pair straight",
+			cards:            []Card{
+				NewCard(Hearts, Two), NewCard(Spades, Two),
+				NewCard(Clubs, Three), NewCard(Diamonds, Three),
+				NewCard(Hearts, Four), NewCard(Spades, Four),
+				NewCard(Clubs, Five), NewCard(Diamonds, Five),
+				NewCard(Hearts, Six), NewCard(Spades, Six),
+				NewCard(Clubs, Seven), NewCard(Diamonds, Seven),
+			},
+			expectedCategory: PairStraight,
+			expectedValid:    true,
+		},
+		{
+			name:             "Unsorted cards valid straight",
+			cards:            []Card{
+				NewCard(Hearts, Seven), NewCard(Spades, Five), NewCard(Clubs, Six), 
+				NewCard(Diamonds, Four), NewCard(Hearts, Three),
+			},
+			expectedCategory: Straight,
+			expectedValid:    true,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			group := NewCardGroup(tc.cards)
+			
+			if group.Category != tc.expectedCategory {
+				t.Errorf("Expected category %v, got %v", tc.expectedCategory, group.Category)
+			}
+			
+			if group.IsValid() != tc.expectedValid {
+				t.Errorf("Expected valid %v, got %v", tc.expectedValid, group.IsValid())
+			}
+		})
+	}
+}
+
+func TestCardGroupSize(t *testing.T) {
+	testCases := []struct {
+		name         string
+		cards        []Card
+		expectedSize int
+	}{
+		{"Empty", []Card{}, 0},
+		{"Single", []Card{NewCard(Hearts, Ace)}, 1},
+		{"Pair", []Card{NewCard(Hearts, Ace), NewCard(Spades, Ace)}, 2},
+		{"Large group", []Card{
+			NewCard(Hearts, Three), NewCard(Spades, Four), NewCard(Clubs, Five), 
+			NewCard(Diamonds, Six), NewCard(Hearts, Seven), NewCard(Spades, Eight),
+		}, 6},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			group := NewCardGroup(tc.cards)
+			if group.Size != tc.expectedSize {
+				t.Errorf("Expected size %d, got %d", tc.expectedSize, group.Size)
+			}
+		})
+	}
+}
+
+func TestCardGroupConsistency(t *testing.T) {
+	// Test that the same cards always produce the same analysis
+	cards := []Card{
+		NewCard(Hearts, Ace), NewCard(Spades, Ace), NewCard(Clubs, Ace),
+	}
+
+	group1 := NewCardGroup(cards)
+	group2 := NewCardGroup(cards)
+
+	if group1.Category != group2.Category {
+		t.Error("Same cards should produce same category")
+	}
+	if group1.Size != group2.Size {
+		t.Error("Same cards should produce same size")
+	}
+	if group1.Rank != group2.Rank {
+		t.Error("Same cards should produce same rank")
+	}
+}

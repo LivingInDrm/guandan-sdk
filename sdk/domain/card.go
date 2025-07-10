@@ -1,6 +1,7 @@
 package domain
 
 import (
+	"fmt"
 	"strconv"
 )
 
@@ -112,4 +113,77 @@ func CardFromID(id CardID) Card {
 	suitVal := int(id) / 15
 	rankVal := int(id) % 15
 	return Card{Suit: Suit(suitVal), Rank: Rank(rankVal)}
+}
+
+// ParseCard parses a card from its string representation
+func ParseCard(cardStr string) (Card, error) {
+	if len(cardStr) == 0 {
+		return Card{}, fmt.Errorf("empty card string")
+	}
+	
+	// Handle jokers
+	if cardStr == "小王" || cardStr == "SJ" {
+		return NewJoker(SmallJoker), nil
+	}
+	if cardStr == "大王" || cardStr == "BJ" {
+		return NewJoker(BigJoker), nil
+	}
+	
+	// Parse suit and rank
+	if len(cardStr) < 2 {
+		return Card{}, fmt.Errorf("invalid card string: %s", cardStr)
+	}
+	
+	suitStr := cardStr[:1]
+	rankStr := cardStr[1:]
+	
+	// Parse suit
+	var suit Suit
+	switch suitStr {
+	case "♥", "H":
+		suit = Hearts
+	case "♦", "D":
+		suit = Diamonds
+	case "♣", "C":
+		suit = Clubs
+	case "♠", "S":
+		suit = Spades
+	default:
+		return Card{}, fmt.Errorf("invalid suit: %s", suitStr)
+	}
+	
+	// Parse rank
+	var rank Rank
+	switch rankStr {
+	case "A":
+		rank = Ace
+	case "2":
+		rank = Two
+	case "3":
+		rank = Three
+	case "4":
+		rank = Four
+	case "5":
+		rank = Five
+	case "6":
+		rank = Six
+	case "7":
+		rank = Seven
+	case "8":
+		rank = Eight
+	case "9":
+		rank = Nine
+	case "10", "T":
+		rank = Ten
+	case "J":
+		rank = Jack
+	case "Q":
+		rank = Queen
+	case "K":
+		rank = King
+	default:
+		return Card{}, fmt.Errorf("invalid rank: %s", rankStr)
+	}
+	
+	return NewCard(suit, rank), nil
 }

@@ -56,6 +56,10 @@ func (d *Deck) ShuffleWithSeed(seed int64) {
 }
 
 func (d *Deck) Deal(numCards int) []Card {
+	if numCards <= 0 {
+		return []Card{}
+	}
+	
 	if numCards > len(d.Cards) {
 		numCards = len(d.Cards)
 	}
