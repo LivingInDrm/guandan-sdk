@@ -1,0 +1,243 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  }
+}
+
+@layer components {
+  /* Card animations */
+  .card-enter {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  
+  .card-enter-active {
+    opacity: 1;
+    transform: translateY(0);
+    transition: opacity 300ms, transform 300ms;
+  }
+  
+  .card-exit {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  
+  .card-exit-active {
+    opacity: 0;
+    transform: translateY(-20px);
+    transition: opacity 300ms, transform 300ms;
+  }
+
+  /* Table animations */
+  .table-card-enter {
+    opacity: 0;
+    transform: scale(0.8);
+  }
+  
+  .table-card-enter-active {
+    opacity: 1;
+    transform: scale(1);
+    transition: opacity 300ms, transform 300ms;
+  }
+
+  /* Selection animations */
+  .card-selected {
+    animation: cardSelect 0.3s ease-out;
+  }
+  
+  @keyframes cardSelect {
+    0% {
+      transform: translateY(0);
+    }
+    50% {
+      transform: translateY(-8px);
+    }
+    100% {
+      transform: translateY(-4px);
+    }
+  }
+
+  /* Pulse animation for current player */
+  .pulse-slow {
+    animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  }
+
+  /* Drag and drop styles */
+  .drag-preview {
+    opacity: 0.8;
+    transform: rotate(5deg);
+  }
+  
+  .drop-zone-active {
+    background-color: rgba(59, 130, 246, 0.1);
+    border-color: rgb(59, 130, 246);
+  }
+  
+  .drop-zone-hover {
+    background-color: rgba(59, 130, 246, 0.2);
+    border-color: rgb(37, 99, 235);
+  }
+
+  /* Loading spinner */
+  .spinner {
+    border: 2px solid #f3f4f6;
+    border-top: 2px solid #3b82f6;
+    border-radius: 50%;
+    width: 20px;
+    height: 20px;
+    animation: spin 1s linear infinite;
+  }
+  
+  @keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+  }
+
+  /* Custom scrollbar */
+  .custom-scrollbar::-webkit-scrollbar {
+    width: 6px;
+  }
+  
+  .custom-scrollbar::-webkit-scrollbar-track {
+    background: #f1f5f9;
+    border-radius: 3px;
+  }
+  
+  .custom-scrollbar::-webkit-scrollbar-thumb {
+    background: #cbd5e1;
+    border-radius: 3px;
+  }
+  
+  .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+    background: #94a3b8;
+  }
+
+  /* Button styles */
+  .btn-primary {
+    @apply bg-blue-500 text-white px-4 py-2 rounded-md hover:bg-blue-600 transition-colors;
+  }
+  
+  .btn-secondary {
+    @apply bg-gray-200 text-gray-800 px-4 py-2 rounded-md hover:bg-gray-300 transition-colors;
+  }
+  
+  .btn-danger {
+    @apply bg-red-500 text-white px-4 py-2 rounded-md hover:bg-red-600 transition-colors;
+  }
+  
+  .btn-disabled {
+    @apply bg-gray-300 text-gray-500 cursor-not-allowed;
+  }
+
+  /* Card suit colors */
+  .suit-hearts {
+    @apply text-red-500;
+  }
+  
+  .suit-diamonds {
+    @apply text-red-500;
+  }
+  
+  .suit-clubs {
+    @apply text-gray-800;
+  }
+  
+  .suit-spades {
+    @apply text-gray-800;
+  }
+  
+  .suit-joker {
+    @apply text-purple-600;
+  }
+
+  /* Game status indicators */
+  .status-waiting {
+    @apply bg-yellow-100 text-yellow-800;
+  }
+  
+  .status-playing {
+    @apply bg-green-100 text-green-800;
+  }
+  
+  .status-finished {
+    @apply bg-gray-100 text-gray-800;
+  }
+  
+  .status-error {
+    @apply bg-red-100 text-red-800;
+  }
+
+  /* Connection status */
+  .connection-connected {
+    @apply text-green-600;
+  }
+  
+  .connection-disconnected {
+    @apply text-red-600;
+  }
+  
+  .connection-connecting {
+    @apply text-yellow-600;
+  }
+}
+
+@layer utilities {
+  /* Custom utilities */
+  .text-shadow {
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+  }
+  
+  .text-shadow-md {
+    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.15);
+  }
+  
+  .text-shadow-lg {
+    text-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+  }
+
+  /* Responsive spacing */
+  .responsive-padding {
+    @apply p-2 sm:p-4 md:p-6 lg:p-8;
+  }
+  
+  .responsive-margin {
+    @apply m-2 sm:m-4 md:m-6 lg:m-8;
+  }
+
+  /* Hover effects */
+  .hover-lift {
+    @apply transition-transform duration-200 hover:scale-105;
+  }
+  
+  .hover-glow {
+    @apply transition-shadow duration-200 hover:shadow-lg;
+  }
+}
+
+/* Custom focus styles */
+.focus-visible:focus {
+  outline: 2px solid #3b82f6;
+  outline-offset: 2px;
+}
+
+/* Print styles */
+@media print {
+  .no-print {
+    display: none !important;
+  }
+}
+
+/* Dark mode support (if needed in the future) */
+@media (prefers-color-scheme: dark) {
+  .dark-mode-card {
+    @apply bg-gray-800 text-white border-gray-700;
+  }
+  
+  .dark-mode-bg {
+    @apply bg-gray-900;
+  }
+}

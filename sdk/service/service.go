@@ -57,6 +57,7 @@ type MatchInstance struct {
 	IsActive      bool
 	Subscribers   map[string]func(event.DomainEvent)
 	SubscribersMu sync.RWMutex
+	DealHistory   [][]domain.SeatID // 存储每个Deal的排名历史
 }
 
 func NewGameService() GameService {
@@ -103,9 +104,21 @@ func (gs *GameServiceImpl) CreateMatch(players []*domain.Player, opt *MatchOptio
 		UpdatedAt:   time.Now(),
 		IsActive:    true,
 		Subscribers: make(map[string]func(event.DomainEvent)),
+		DealHistory: make([][]domain.SeatID, 0),
 	}
 	
 	gs.matches[matchID] = matchInstance
+	
+	// 订阅Deal结束事件以记录排名
+	gs.eventBus.SubscribeWithCallback(matchID, func(domainEvent event.DomainEvent) {
+		if dealEndedEvent, ok := domainEvent.(*event.DealEndedEvent); ok {
+			gs.mu.Lock()
+			if instance, exists := gs.matches[matchID]; exists {
+				instance.DealHistory = append(instance.DealHistory, dealEndedEvent.RankList)
+			}
+			gs.mu.Unlock()
+		}
+	})
 	
 	matchCtx = matchCtx.WithState(domain.MatchStateInProgress)
 	matchInstance.MatchCtx = matchCtx
@@ -144,9 +157,14 @@ func (gs *GameServiceImpl) StartNextDeal(matchID domain.MatchID) error {
 	}
 	
 	dealNumber := matchInstance.MatchCtx.CurrentDeal + 1
-	firstPlayer := gs.calculateFirstPlayer(dealNumber)
 	
-	if err := matchInstance.Engine.StartDeal(dealNumber, firstPlayer); err != nil {
+	// 获取上一Deal的排名，用于确定本Deal的首出者
+	var lastRankings []domain.SeatID
+	if len(matchInstance.DealHistory) > 0 {
+		lastRankings = matchInstance.DealHistory[len(matchInstance.DealHistory)-1]
+	}
+	
+	if err := matchInstance.Engine.StartDeal(dealNumber, lastRankings); err != nil {
 		return fmt.Errorf("failed to start deal: %w", err)
 	}
 	
@@ -355,14 +373,6 @@ func (gs *GameServiceImpl) calculateTrump(dealNumber int) domain.Rank {
 	return trumps[index]
 }
 
-func (gs *GameServiceImpl) calculateFirstPlayer(dealNumber int) domain.SeatID {
-	players := []domain.SeatID{
-		domain.SeatEast, domain.SeatSouth, domain.SeatWest, domain.SeatNorth,
-	}
-	
-	index := (dealNumber - 1) % len(players)
-	return players[index]
-}
 
 func (gs *GameServiceImpl) createSnapshot(matchInstance *MatchInstance) *MatchSnapshot {
 	snapshot := &MatchSnapshot{

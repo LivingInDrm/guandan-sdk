@@ -292,6 +292,22 @@ func NewTributeCardSelectedEvent(matchID domain.MatchID, selector, selectedFrom 
 	}
 }
 
+type FirstPlayerDeterminedEvent struct {
+	BaseEvent
+	FirstPlayer domain.SeatID
+}
+
+func NewFirstPlayerDeterminedEvent(matchID domain.MatchID, firstPlayer domain.SeatID) *FirstPlayerDeterminedEvent {
+	return &FirstPlayerDeterminedEvent{
+		BaseEvent: BaseEvent{
+			EventTypeName: "FirstPlayerDetermined",
+			EventTime:     time.Now(),
+			MatchIDValue:  matchID,
+		},
+		FirstPlayer: firstPlayer,
+	}
+}
+
 type EventBus struct {
 	mu           sync.RWMutex
 	subscribers  map[domain.MatchID][]chan<- DomainEvent

@@ -1,0 +1,510 @@
+{
+  "config": {
+    "configFile": "/Users/xiaochunliu/program/guandan/e2e/playwright.config.ts",
+    "rootDir": "/Users/xiaochunliu/program/guandan/e2e/tests",
+    "forbidOnly": false,
+    "fullyParallel": false,
+    "globalSetup": null,
+    "globalTeardown": null,
+    "globalTimeout": 0,
+    "grep": {},
+    "grepInvert": null,
+    "maxFailures": 0,
+    "metadata": {
+      "actualWorkers": 1
+    },
+    "preserveOutput": "always",
+    "reporter": [
+      [
+        "html",
+        null
+      ],
+      [
+        "json",
+        {
+          "outputFile": "test-results.json"
+        }
+      ],
+      [
+        "list",
+        null
+      ]
+    ],
+    "reportSlowTests": {
+      "max": 5,
+      "threshold": 300000
+    },
+    "quiet": false,
+    "projects": [
+      {
+        "outputDir": "/Users/xiaochunliu/program/guandan/e2e/test-results",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "chromium",
+        "name": "chromium",
+        "testDir": "/Users/xiaochunliu/program/guandan/e2e/tests",
+        "testIgnore": [],
+        "testMatch": [
+          "**/*.@(spec|test).?(c|m)[jt]s?(x)"
+        ],
+        "timeout": 120000
+      },
+      {
+        "outputDir": "/Users/xiaochunliu/program/guandan/e2e/test-results",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "firefox",
+        "name": "firefox",
+        "testDir": "/Users/xiaochunliu/program/guandan/e2e/tests",
+        "testIgnore": [],
+        "testMatch": [
+          "**/*.@(spec|test).?(c|m)[jt]s?(x)"
+        ],
+        "timeout": 120000
+      },
+      {
+        "outputDir": "/Users/xiaochunliu/program/guandan/e2e/test-results",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "webkit",
+        "name": "webkit",
+        "testDir": "/Users/xiaochunliu/program/guandan/e2e/tests",
+        "testIgnore": [],
+        "testMatch": [
+          "**/*.@(spec|test).?(c|m)[jt]s?(x)"
+        ],
+        "timeout": 120000
+      }
+    ],
+    "shard": null,
+    "updateSnapshots": "missing",
+    "updateSourceMethod": "patch",
+    "version": "1.53.2",
+    "workers": 1,
+    "webServer": null
+  },
+  "suites": [
+    {
+      "title": "debug-game-start.spec.ts",
+      "file": "debug-game-start.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [],
+      "suites": [
+        {
+          "title": "Game Start Debug Tests",
+          "file": "debug-game-start.spec.ts",
+          "line": 3,
+          "column": 6,
+          "specs": [
+            {
+              "title": "debug game start flow with 4 players",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 120000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 10756,
+                      "errors": [],
+                      "stdout": [
+                        {
+                          "text": "Player 0 creating room...\n"
+                        },
+                        {
+                          "text": "Room created: room_1752110997698874551\n"
+                        },
+                        {
+                          "text": "Player 1 joining room...\n"
+                        },
+                        {
+                          "text": "Player 2 joining room...\n"
+                        },
+                        {
+                          "text": "Player 3 joining room...\n"
+                        },
+                        {
+                          "text": "Player 0 sees: 4/4 人\n"
+                        },
+                        {
+                          "text": "Player 1 sees: 4/4 人\n"
+                        },
+                        {
+                          "text": "Player 2 sees: 4/4 人\n"
+                        },
+                        {
+                          "text": "Player 3 sees: 4/4 人\n"
+                        },
+                        {
+                          "text": "Checking for game start elements...\n"
+                        },
+                        {
+                          "text": "Player 0 game started: false\n"
+                        },
+                        {
+                          "text": "Player 1 game started: false\n"
+                        },
+                        {
+                          "text": "Player 2 game started: false\n"
+                        },
+                        {
+                          "text": "Player 3 game started: false\n"
+                        },
+                        {
+                          "text": "Attempting to start game...\n"
+                        },
+                        {
+                          "text": "All players connected, looking for start button...\n"
+                        },
+                        {
+                          "text": "No start button found, game might auto-start\n"
+                        },
+                        {
+                          "text": "Player 0 has 0 card elements\n"
+                        },
+                        {
+                          "text": "Player 1 has 0 card elements\n"
+                        },
+                        {
+                          "text": "Player 2 has 0 card elements\n"
+                        },
+                        {
+                          "text": "Player 3 has 0 card elements\n"
+                        },
+                        {
+                          "text": "\n=== ALL CONSOLE LOGS ===\n"
+                        },
+                        {
+                          "text": "Player 0 [error]: Failed to load resource: the server responded with a status of 404 (Not Found)\n"
+                        },
+                        {
+                          "text": "Player 2 [log]: Unknown event type: MatchCreated\n"
+                        },
+                        {
+                          "text": "Player 0 [log]: Unknown event type: MatchCreated\n"
+                        },
+                        {
+                          "text": "Player 1 [log]: Unknown event type: MatchCreated\n"
+                        },
+                        {
+                          "text": "Player 3 [log]: Unknown event type: MatchCreated\n"
+                        },
+                        {
+                          "text": "Player 2 [error]: Failed to parse WebSocket message: TypeError: Cannot read properties of undefined (reading 'west')\n    at X0 (http://localhost:5173/assets/index-ed9ad714.js:173:17399)\n    at http://localhost:5173/assets/index-ed9ad714.js:173:15042\n    at http://localhost:5173/assets/index-ed9ad714.js:173:7096\n    at R0.produce (http://localhost:5173/assets/index-ed9ad714.js:173:7247)\n    at http://localhost:5173/assets/index-ed9ad714.js:173:7081\n    at r (http://localhost:5173/assets/index-ed9ad714.js:157:854)\n    at r.setState (http://localhost:5173/assets/index-ed9ad714.js:173:9111)\n    at Object.handleEvent (http://localhost:5173/assets/index-ed9ad714.js:173:14752)\n    at Object.onMessage (http://localhost:5173/assets/index-ed9ad714.js:173:13047)\n    at U0.handleMessage (http://localhost:5173/assets/index-ed9ad714.js:173:11612)\n"
+                        },
+                        {
+                          "text": "Player 3 [error]: Failed to parse WebSocket message: TypeError: Cannot read properties of undefined (reading 'north')\n    at X0 (http://localhost:5173/assets/index-ed9ad714.js:173:17399)\n    at http://localhost:5173/assets/index-ed9ad714.js:173:15042\n    at http://localhost:5173/assets/index-ed9ad714.js:173:7096\n    at R0.produce (http://localhost:5173/assets/index-ed9ad714.js:173:7247)\n    at http://localhost:5173/assets/index-ed9ad714.js:173:7081\n    at r (http://localhost:5173/assets/index-ed9ad714.js:157:854)\n    at r.setState (http://localhost:5173/assets/index-ed9ad714.js:173:9111)\n    at Object.handleEvent (http://localhost:5173/assets/index-ed9ad714.js:173:14752)\n    at Object.onMessage (http://localhost:5173/assets/index-ed9ad714.js:173:13047)\n    at U0.handleMessage (http://localhost:5173/assets/index-ed9ad714.js:173:11612)\n"
+                        },
+                        {
+                          "text": "Player 0 [error]: Failed to parse WebSocket message: TypeError: Cannot read properties of undefined (reading 'east')\n    at X0 (http://localhost:5173/assets/index-ed9ad714.js:173:17399)\n    at http://localhost:5173/assets/index-ed9ad714.js:173:15042\n    at http://localhost:5173/assets/index-ed9ad714.js:173:7096\n    at R0.produce (http://localhost:5173/assets/index-ed9ad714.js:173:7247)\n    at http://localhost:5173/assets/index-ed9ad714.js:173:7081\n    at r (http://localhost:5173/assets/index-ed9ad714.js:157:854)\n    at r.setState (http://localhost:5173/assets/index-ed9ad714.js:173:9111)\n    at Object.handleEvent (http://localhost:5173/assets/index-ed9ad714.js:173:14752)\n    at Object.onMessage (http://localhost:5173/assets/index-ed9ad714.js:173:13047)\n    at U0.handleMessage (http://localhost:5173/assets/index-ed9ad714.js:173:11612)\n"
+                        },
+                        {
+                          "text": "Player 1 [error]: Failed to parse WebSocket message: TypeError: Cannot read properties of undefined (reading 'south')\n    at X0 (http://localhost:5173/assets/index-ed9ad714.js:173:17399)\n    at http://localhost:5173/assets/index-ed9ad714.js:173:15042\n    at http://localhost:5173/assets/index-ed9ad714.js:173:7096\n    at R0.produce (http://localhost:5173/assets/index-ed9ad714.js:173:7247)\n    at http://localhost:5173/assets/index-ed9ad714.js:173:7081\n    at r (http://localhost:5173/assets/index-ed9ad714.js:157:854)\n    at r.setState (http://localhost:5173/assets/index-ed9ad714.js:173:9111)\n    at Object.handleEvent (http://localhost:5173/assets/index-ed9ad714.js:173:14752)\n    at Object.onMessage (http://localhost:5173/assets/index-ed9ad714.js:173:13047)\n    at U0.handleMessage (http://localhost:5173/assets/index-ed9ad714.js:173:11612)\n"
+                        },
+                        {
+                          "text": "\n=== ALL NETWORK ERRORS ===\n"
+                        }
+                      ],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2025-07-10T01:29:56.781Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "bdf62813579d1ad8405c-a933d6e1de028650ca4c",
+              "file": "debug-game-start.spec.ts",
+              "line": 4,
+              "column": 7
+            },
+            {
+              "title": "debug game start flow with 4 players",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 120000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "firefox",
+                  "projectName": "firefox",
+                  "results": [
+                    {
+                      "workerIndex": 1,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 11255,
+                      "errors": [],
+                      "stdout": [
+                        {
+                          "text": "Player 0 creating room...\n"
+                        },
+                        {
+                          "text": "Room created: room_1752111009730660626\n"
+                        },
+                        {
+                          "text": "Player 1 joining room...\n"
+                        },
+                        {
+                          "text": "Player 2 joining room...\n"
+                        },
+                        {
+                          "text": "Player 3 joining room...\n"
+                        },
+                        {
+                          "text": "Player 0 sees: 4/4 人\n"
+                        },
+                        {
+                          "text": "Player 1 sees: 4/4 人\n"
+                        },
+                        {
+                          "text": "Player 2 sees: 4/4 人\n"
+                        },
+                        {
+                          "text": "Player 3 sees: 4/4 人\n"
+                        },
+                        {
+                          "text": "Checking for game start elements...\n"
+                        },
+                        {
+                          "text": "Player 0 game started: false\n"
+                        },
+                        {
+                          "text": "Player 1 game started: false\n"
+                        },
+                        {
+                          "text": "Player 2 game started: false\n"
+                        },
+                        {
+                          "text": "Player 3 game started: false\n"
+                        },
+                        {
+                          "text": "Attempting to start game...\n"
+                        },
+                        {
+                          "text": "All players connected, looking for start button...\n"
+                        },
+                        {
+                          "text": "No start button found, game might auto-start\n"
+                        },
+                        {
+                          "text": "Player 0 has 0 card elements\n"
+                        },
+                        {
+                          "text": "Player 1 has 0 card elements\n"
+                        },
+                        {
+                          "text": "Player 2 has 0 card elements\n"
+                        },
+                        {
+                          "text": "Player 3 has 0 card elements\n"
+                        },
+                        {
+                          "text": "\n=== ALL CONSOLE LOGS ===\n"
+                        },
+                        {
+                          "text": "Player 1 [log]: Unknown event type: MatchCreated\n"
+                        },
+                        {
+                          "text": "Player 2 [log]: Unknown event type: MatchCreated\n"
+                        },
+                        {
+                          "text": "Player 0 [log]: Unknown event type: MatchCreated\n"
+                        },
+                        {
+                          "text": "Player 0 [error]: Failed to parse WebSocket message: Error\n"
+                        },
+                        {
+                          "text": "Player 1 [error]: Failed to parse WebSocket message: Error\n"
+                        },
+                        {
+                          "text": "Player 2 [error]: Failed to parse WebSocket message: Error\n"
+                        },
+                        {
+                          "text": "Player 3 [log]: Unknown event type: MatchCreated\n"
+                        },
+                        {
+                          "text": "Player 3 [error]: Failed to parse WebSocket message: Error\n"
+                        },
+                        {
+                          "text": "\n=== ALL NETWORK ERRORS ===\n"
+                        }
+                      ],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2025-07-10T01:30:08.148Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "bdf62813579d1ad8405c-ce11b17e0ae7f5fa0ede",
+              "file": "debug-game-start.spec.ts",
+              "line": 4,
+              "column": 7
+            },
+            {
+              "title": "debug game start flow with 4 players",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 120000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "webkit",
+                  "projectName": "webkit",
+                  "results": [
+                    {
+                      "workerIndex": 2,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 10322,
+                      "errors": [],
+                      "stdout": [
+                        {
+                          "text": "Player 0 creating room...\n"
+                        },
+                        {
+                          "text": "Room created: room_1752111020804872381\n"
+                        },
+                        {
+                          "text": "Player 1 joining room...\n"
+                        },
+                        {
+                          "text": "Player 2 joining room...\n"
+                        },
+                        {
+                          "text": "Player 3 joining room...\n"
+                        },
+                        {
+                          "text": "Player 0 sees: 4/4 人\n"
+                        },
+                        {
+                          "text": "Player 1 sees: 4/4 人\n"
+                        },
+                        {
+                          "text": "Player 2 sees: 4/4 人\n"
+                        },
+                        {
+                          "text": "Player 3 sees: 4/4 人\n"
+                        },
+                        {
+                          "text": "Checking for game start elements...\n"
+                        },
+                        {
+                          "text": "Player 0 game started: false\n"
+                        },
+                        {
+                          "text": "Player 1 game started: false\n"
+                        },
+                        {
+                          "text": "Player 2 game started: false\n"
+                        },
+                        {
+                          "text": "Player 3 game started: false\n"
+                        },
+                        {
+                          "text": "Attempting to start game...\n"
+                        },
+                        {
+                          "text": "All players connected, looking for start button...\n"
+                        },
+                        {
+                          "text": "No start button found, game might auto-start\n"
+                        },
+                        {
+                          "text": "Player 0 has 0 card elements\n"
+                        },
+                        {
+                          "text": "Player 1 has 0 card elements\n"
+                        },
+                        {
+                          "text": "Player 2 has 0 card elements\n"
+                        },
+                        {
+                          "text": "Player 3 has 0 card elements\n"
+                        },
+                        {
+                          "text": "\n=== ALL CONSOLE LOGS ===\n"
+                        },
+                        {
+                          "text": "Player 1 [log]: Unknown event type: MatchCreated\n"
+                        },
+                        {
+                          "text": "Player 0 [log]: Unknown event type: MatchCreated\n"
+                        },
+                        {
+                          "text": "Player 2 [log]: Unknown event type: MatchCreated\n"
+                        },
+                        {
+                          "text": "Player 0 [error]: Failed to parse WebSocket message: TypeError: undefined is not an object (evaluating 'n[e.mySeat]')\n"
+                        },
+                        {
+                          "text": "Player 1 [error]: Failed to parse WebSocket message: TypeError: undefined is not an object (evaluating 'n[e.mySeat]')\n"
+                        },
+                        {
+                          "text": "Player 2 [error]: Failed to parse WebSocket message: TypeError: undefined is not an object (evaluating 'n[e.mySeat]')\n"
+                        },
+                        {
+                          "text": "Player 3 [log]: Unknown event type: MatchCreated\n"
+                        },
+                        {
+                          "text": "Player 3 [error]: Failed to parse WebSocket message: TypeError: undefined is not an object (evaluating 'n[e.mySeat]')\n"
+                        },
+                        {
+                          "text": "\n=== ALL NETWORK ERRORS ===\n"
+                        }
+                      ],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2025-07-10T01:30:20.304Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "bdf62813579d1ad8405c-f08cba339b8792befe91",
+              "file": "debug-game-start.spec.ts",
+              "line": 4,
+              "column": 7
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "errors": [],
+  "stats": {
+    "startTime": "2025-07-10T01:29:56.510Z",
+    "duration": 34259.117999999995,
+    "expected": 3,
+    "skipped": 0,
+    "unexpected": 0,
+    "flaky": 0
+  }
+}

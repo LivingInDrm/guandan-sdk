@@ -172,6 +172,25 @@ func NewDealCtxWithHistory(dealNumber int, trump Rank, firstPlayer SeatID, lastR
 	return ctx
 }
 
+// NewDealCtxWithAutoFirstPlayer 创建自动确定首出者的DealCtx
+func NewDealCtxWithAutoFirstPlayer(matchCtx *MatchCtx, dealNumber int, trump Rank, lastRankings []SeatID, startingCardHolder SeatID) *DealCtx {
+	// 创建临时的DealCtx来进行首出者判定
+	tempCtx := &DealCtx{
+		DealNumber:   dealNumber,
+		IsFirstDeal:  dealNumber == 1,
+		LastRankings: lastRankings,
+		Trump:        trump,
+	}
+	
+	// 确定首出者
+	firstPlayer := DetermineFirstPlayer(matchCtx, tempCtx, startingCardHolder)
+	
+	// 创建最终的DealCtx
+	ctx := NewDealCtx(dealNumber, trump, firstPlayer)
+	ctx.LastRankings = lastRankings
+	return ctx
+}
+
 func (d *DealCtx) WithState(state DealState) *DealCtx {
 	newCtx := *d
 	newCtx.State = state
@@ -395,4 +414,126 @@ func (t *TrickCtx) GetNextPlayer() SeatID {
 
 func (t *TrickCtx) ShouldFinish() bool {
 	return t.GetActivePlayerCount() <= 1
+}
+
+// DetermineFirstPlayer 根据游戏规则确定本Deal的首出者
+func DetermineFirstPlayer(matchCtx *MatchCtx, dealCtx *DealCtx, startingCardHolder SeatID) SeatID {
+	// 首Deal：持有Starting Card者先出
+	if dealCtx.IsFirstDeal {
+		return startingCardHolder
+	}
+	
+	// 非首Deal：根据上一Deal结果和是否有Tribute Immunity判定
+	if dealCtx.LastRankings == nil || len(dealCtx.LastRankings) != 4 {
+		// 数据不完整，默认使用East
+		return SeatEast
+	}
+	
+	// 获取上一Deal的排名
+	first := dealCtx.LastRankings[0]
+	fourth := dealCtx.LastRankings[3]
+	third := dealCtx.LastRankings[2]
+	
+	// 判断贡牌场景
+	scenario := DetermineTributeScenario(dealCtx.LastRankings)
+	
+	// 检查是否有Tribute Immunity
+	hasImmunity := false
+	if dealCtx.TributeInfo != nil {
+		hasImmunity = dealCtx.TributeInfo.HasImmunity
+	}
+	
+	switch scenario {
+	case TributeScenarioDoubleDown:
+		if hasImmunity {
+			// 有Immunity：上轮Deal第1名
+			return first
+		} else {
+			// 无Immunity：首选贡牌较大者；若两张贡牌一样大，则选择上轮Deal的第一名的顺时针下家
+			return determineDoubleDownFirstPlayer(dealCtx, first)
+		}
+		
+	case TributeScenarioSingleLast:
+		if hasImmunity {
+			// 有Immunity：上轮Deal第1名
+			return first
+		} else {
+			// 无Immunity：上轮Deal的第4名
+			return fourth
+		}
+		
+	case TributeScenarioPartnerLast:
+		if hasImmunity {
+			// 有Immunity：上轮Deal第1名
+			return first
+		} else {
+			// 无Immunity：上轮Deal的第3名
+			return third
+		}
+		
+	default:
+		// 其他情况默认使用第一名
+		return first
+	}
+}
+
+// determineDoubleDownFirstPlayer 确定DoubleDown场景下的首出者
+func determineDoubleDownFirstPlayer(dealCtx *DealCtx, first SeatID) SeatID {
+	if dealCtx.TributeInfo == nil || len(dealCtx.TributeInfo.GivenTributes) == 0 {
+		// 没有贡牌信息，使用第一名的顺时针下家
+		return first.Next()
+	}
+	
+	// 获取两张贡牌
+	third := dealCtx.LastRankings[2]
+	fourth := dealCtx.LastRankings[3]
+	
+	thirdCard, thirdExists := dealCtx.TributeInfo.GivenTributes[third]
+	fourthCard, fourthExists := dealCtx.TributeInfo.GivenTributes[fourth]
+	
+	// 如果贡牌信息不完整，使用第一名的顺时针下家
+	if !thirdExists || !fourthExists {
+		return first.Next()
+	}
+	
+	// 比较两张贡牌的大小
+	trump := dealCtx.Trump
+	thirdValue := getTributeCardValue(thirdCard, trump)
+	fourthValue := getTributeCardValue(fourthCard, trump)
+	
+	if thirdValue > fourthValue {
+		// 第三名贡牌更大，选择第三名的贡牌接收者
+		return getDoubleDownReceiver(dealCtx, third)
+	} else if fourthValue > thirdValue {
+		// 第四名贡牌更大，选择第四名的贡牌接收者
+		return getDoubleDownReceiver(dealCtx, fourth)
+	} else {
+		// 两张贡牌一样大，选择第一名的顺时针下家
+		return first.Next()
+	}
+}
+
+// getDoubleDownReceiver 获取DoubleDown场景下的实际接收者
+func getDoubleDownReceiver(dealCtx *DealCtx, giver SeatID) SeatID {
+	// 如果有ActualReceivers信息，使用实际接收者
+	if dealCtx.TributeInfo != nil && dealCtx.TributeInfo.ActualReceivers != nil {
+		if receiver, exists := dealCtx.TributeInfo.ActualReceivers[giver]; exists {
+			return receiver
+		}
+	}
+	
+	// 否则使用默认映射：第三名->第一名，第四名->第二名
+	if len(dealCtx.LastRankings) >= 4 {
+		first := dealCtx.LastRankings[0]
+		second := dealCtx.LastRankings[1]
+		third := dealCtx.LastRankings[2]
+		
+		if giver == third {
+			return first
+		} else {
+			return second
+		}
+	}
+	
+	return SeatEast // 默认值
 }

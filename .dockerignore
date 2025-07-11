@@ -1,0 +1,65 @@
+# Build artifacts
+dist/
+build/
+*.exe
+*.dll
+*.so
+*.dylib
+guandan-server
+
+# Dependencies
+node_modules/
+vendor/
+
+# Development files
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Git
+.git/
+.gitignore
+
+# Documentation
+README.md
+docs/
+*.md
+
+# Test files
+*_test.go
+test/
+tests/
+coverage/
+*.test
+
+# Frontend specific
+frontend/dist/
+frontend/node_modules/
+frontend/.env*
+frontend/coverage/
+
+# Logs
+*.log
+logs/
+
+# Temporary files
+tmp/
+temp/
+
+# Docker
+Dockerfile
+docker-compose*.yml
+.dockerignore

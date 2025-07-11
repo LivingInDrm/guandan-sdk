@@ -87,20 +87,21 @@ func (sm *DealStateMachine) GetTrickCtx() *domain.TrickCtx {
 	return sm.trickCtx
 }
 
-func (sm *DealStateMachine) StartDeal(dealNumber int, firstPlayer domain.SeatID) error {
+func (sm *DealStateMachine) StartDeal(dealNumber int, lastRankings []domain.SeatID) error {
 	if sm.currentPhase != PhaseIdle {
 		return fmt.Errorf("cannot start deal from phase %s", sm.currentPhase.String())
 	}
 	
-	// Create deal context without trump - trump will be determined in P2 phase
-	sm.dealCtx = domain.NewDealCtx(dealNumber, domain.Two, firstPlayer) // Temporary trump
+	// Create deal context without first player - will be determined after cards are dealt
+	// For now, use a temporary first player that will be updated in StartFirstPlay
+	sm.dealCtx = domain.NewDealCtxWithHistory(dealNumber, domain.Two, domain.SeatEast, lastRankings) // Temporary trump and first player
 	sm.currentPhase = PhaseCreated
 	
 	sm.eventBus.Publish(event.NewDealStartedEvent(
 		sm.matchCtx.ID,
 		dealNumber,
 		domain.Two, // Temporary trump
-		firstPlayer,
+		domain.SeatEast, // Temporary first player
 	))
 	
 	return nil
@@ -468,10 +469,24 @@ func (sm *DealStateMachine) StartFirstPlay() error {
 		return fmt.Errorf("cannot start first play from phase %s", sm.currentPhase.String())
 	}
 	
+	// 确定首出者
+	firstPlayer := domain.DetermineFirstPlayer(sm.matchCtx, sm.dealCtx, sm.startingCardHolder)
+	
+	// 更新DealCtx中的FirstPlayer
+	newDealCtx := *sm.dealCtx
+	newDealCtx.FirstPlayer = firstPlayer
+	sm.dealCtx = &newDealCtx
+	
 	sm.dealCtx = sm.dealCtx.WithState(domain.DealStateFirstPlay)
 	sm.currentPhase = PhaseFirstPlay
 	
-	sm.trickCtx = domain.NewTrickCtx(1, sm.dealCtx.FirstPlayer)
+	sm.trickCtx = domain.NewTrickCtx(1, firstPlayer)
+	
+	// 发布首出者确定事件
+	sm.eventBus.Publish(event.NewFirstPlayerDeterminedEvent(
+		sm.matchCtx.ID,
+		firstPlayer,
+	))
 	
 	return nil
 }

@@ -301,6 +301,7 @@ func (cg *CardGroup) String() string {
 
 type ComparisonKey struct {
 	Category CardCategory
+	CAT      int  // CAT value (0-5) according to Guandan rules
 	Size     int
 	Rank     Rank
 }
@@ -308,7 +309,52 @@ type ComparisonKey struct {
 func (cg *CardGroup) ComparisonKey() ComparisonKey {
 	return ComparisonKey{
 		Category: cg.Category,
+		CAT:      cg.GetCATValue(),
 		Size:     cg.Size,
 		Rank:     cg.Rank,
 	}
+}
+
+// GetCATValue returns the correct CAT value (0-5) according to Guandan rules
+func (cg *CardGroup) GetCATValue() int {
+	switch cg.Category {
+	case JokerBomb:
+		return 5 // 王炸
+	case Bomb:
+		if cg.Size == 8 {
+			return 4 // 8张炸弹
+		} else if cg.Size == 7 {
+			return 4 // 7张炸弹
+		} else if cg.Size == 6 {
+			return 4 // 6张炸弹
+		} else if cg.Size == 5 {
+			return 2 // 5张炸弹
+		} else if cg.Size == 4 {
+			return 1 // 4张炸弹
+		}
+		return 0 // fallback
+	case Straight:
+		// 检查是否是同花顺
+		if cg.isStraightFlush() {
+			return 3 // 同花顺
+		}
+		return 0 // 普通顺子
+	default:
+		return 0 // 其他牌型(单张、对子、三同张、三带二、三连对、钢板等)
+	}
+}
+
+// isStraightFlush checks if the straight is a flush (same suit)
+func (cg *CardGroup) isStraightFlush() bool {
+	if cg.Category != Straight || len(cg.Cards) != 5 {
+		return false
+	}
+	
+	firstSuit := cg.Cards[0].Suit
+	for _, card := range cg.Cards {
+		if card.Suit != firstSuit {
+			return false
+		}
+	}
+	return true
 }

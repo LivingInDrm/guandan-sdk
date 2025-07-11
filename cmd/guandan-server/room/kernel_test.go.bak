@@ -1,0 +1,344 @@
+package room
+
+import (
+	"fmt"
+	"testing"
+	"time"
+
+	"github.com/gorilla/websocket"
+	"guandan/sdk/domain"
+	"guandan/sdk/service"
+)
+
+func TestRoomKernel_NewRoomKernel(t *testing.T) {
+	gameService := service.NewGameService()
+	config := DefaultRoomConfig
+	
+	kernel := NewRoomKernel("test-room", gameService, config)
+	
+	if kernel == nil {
+		t.Fatal("Expected kernel to be created")
+	}
+	
+	if kernel.roomID != "test-room" {
+		t.Errorf("Expected room ID to be 'test-room', got %s", kernel.roomID)
+	}
+	
+	if kernel.gameService == nil {
+		t.Error("Expected game service to be set")
+	}
+	
+	if len(kernel.players) != 0 {
+		t.Errorf("Expected empty players map, got %d players", len(kernel.players))
+	}
+	
+	if kernel.version != 1 {
+		t.Errorf("Expected version to be 1, got %d", kernel.version)
+	}
+}
+
+func TestRoomKernel_Start(t *testing.T) {
+	gameService := service.NewGameService()
+	config := RoomConfig{
+		MaxPlayers:    4,
+		IdleTimeout:   1 * time.Minute,
+		PingInterval:  10 * time.Second,
+		AllowReconnect: true,
+	}
+	
+	kernel := NewRoomKernel("test-room", gameService, config)
+	
+	err := kernel.Start()
+	if err != nil {
+		t.Fatalf("Expected no error starting kernel, got %v", err)
+	}
+	
+	// Clean up
+	defer kernel.Stop()
+	
+	// Give some time for goroutines to start
+	time.Sleep(100 * time.Millisecond)
+	
+	select {
+	case <-kernel.ctx.Done():
+		t.Error("Expected context to not be cancelled")
+	default:
+		// Good, context is still active
+	}
+}
+
+func TestRoomKernel_Stop(t *testing.T) {
+	gameService := service.NewGameService()
+	config := DefaultRoomConfig
+	
+	kernel := NewRoomKernel("test-room", gameService, config)
+	
+	err := kernel.Start()
+	if err != nil {
+		t.Fatalf("Expected no error starting kernel, got %v", err)
+	}
+	
+	// Add a mock player
+	mockConn := &MockWebSocketConn{}
+	kernel.players[domain.SeatEast] = NewPlayerConn("test-player", domain.SeatEast, mockConn)
+	
+	kernel.Stop()
+	
+	// Check that context is cancelled
+	select {
+	case <-kernel.ctx.Done():
+		// Good, context is cancelled
+	case <-time.After(100 * time.Millisecond):
+		t.Error("Expected context to be cancelled")
+	}
+	
+	// Check that player was cleaned up
+	if len(kernel.players) != 0 {
+		t.Errorf("Expected players to be cleared, got %d players", len(kernel.players))
+	}
+}
+
+func TestRoomKernel_AddPlayer(t *testing.T) {
+	gameService := service.NewGameService()
+	config := DefaultRoomConfig
+	
+	kernel := NewRoomKernel("test-room", gameService, config)
+	
+	err := kernel.Start()
+	if err != nil {
+		t.Fatalf("Expected no error starting kernel, got %v", err)
+	}
+	defer kernel.Stop()
+	
+	mockConn := &MockWebSocketConn{}
+	
+	// Add first player
+	err = kernel.AddPlayer("player1", domain.SeatEast, mockConn)
+	if err != nil {
+		t.Fatalf("Expected no error adding player, got %v", err)
+	}
+	
+	if len(kernel.players) != 1 {
+		t.Errorf("Expected 1 player, got %d", len(kernel.players))
+	}
+	
+	player := kernel.players[domain.SeatEast]
+	if player.PlayerID != "player1" {
+		t.Errorf("Expected player ID to be 'player1', got %s", player.PlayerID)
+	}
+	
+	// Try to add player to same seat
+	err = kernel.AddPlayer("player2", domain.SeatEast, mockConn)
+	if err != ErrSeatTaken {
+		t.Errorf("Expected ErrSeatTaken, got %v", err)
+	}
+	
+	// Add players to fill room
+	for i, seat := range []domain.SeatID{domain.SeatSouth, domain.SeatWest, domain.SeatNorth} {
+		err = kernel.AddPlayer(fmt.Sprintf("player%d", i+2), seat, &MockWebSocketConn{})
+		if err != nil {
+			t.Fatalf("Expected no error adding player %d, got %v", i+2, err)
+		}
+	}
+	
+	// Try to add one more player
+	err = kernel.AddPlayer("player5", domain.SeatEast, mockConn)
+	if err != ErrRoomFull {
+		t.Errorf("Expected ErrRoomFull, got %v", err)
+	}
+}
+
+func TestRoomKernel_RemovePlayer(t *testing.T) {
+	gameService := service.NewGameService()
+	config := DefaultRoomConfig
+	
+	kernel := NewRoomKernel("test-room", gameService, config)
+	
+	err := kernel.Start()
+	if err != nil {
+		t.Fatalf("Expected no error starting kernel, got %v", err)
+	}
+	defer kernel.Stop()
+	
+	mockConn := &MockWebSocketConn{}
+	
+	// Add player
+	err = kernel.AddPlayer("player1", domain.SeatEast, mockConn)
+	if err != nil {
+		t.Fatalf("Expected no error adding player, got %v", err)
+	}
+	
+	// Remove player
+	kernel.RemovePlayer(domain.SeatEast)
+	
+	if len(kernel.players) != 0 {
+		t.Errorf("Expected 0 players, got %d", len(kernel.players))
+	}
+	
+	// Remove non-existent player (should not panic)
+	kernel.RemovePlayer(domain.SeatSouth)
+}
+
+func TestRoomKernel_GetSnapshot(t *testing.T) {
+	gameService := service.NewGameService()
+	config := DefaultRoomConfig
+	
+	kernel := NewRoomKernel("test-room", gameService, config)
+	
+	err := kernel.Start()
+	if err != nil {
+		t.Fatalf("Expected no error starting kernel, got %v", err)
+	}
+	defer kernel.Stop()
+	
+	// Get snapshot with no players
+	snapshot, err := kernel.GetSnapshot()
+	if err != nil {
+		t.Fatalf("Expected no error getting snapshot, got %v", err)
+	}
+	
+	if snapshot.MatchID != "test-room" {
+		t.Errorf("Expected match ID to be 'test-room', got %s", snapshot.MatchID)
+	}
+	
+	if snapshot.Status != "waiting" {
+		t.Errorf("Expected status to be 'waiting', got %s", snapshot.Status)
+	}
+	
+	if len(snapshot.Players) != 0 {
+		t.Errorf("Expected 0 players, got %d", len(snapshot.Players))
+	}
+	
+	// Add players
+	for i, seat := range []domain.SeatID{domain.SeatEast, domain.SeatSouth} {
+		err = kernel.AddPlayer(fmt.Sprintf("player%d", i+1), seat, newMockConn())
+		if err != nil {
+			t.Fatalf("Expected no error adding player %d, got %v", i+1, err)
+		}
+	}
+	
+	// Get snapshot with players
+	snapshot, err = kernel.GetSnapshot()
+	if err != nil {
+		t.Fatalf("Expected no error getting snapshot, got %v", err)
+	}
+	
+	if len(snapshot.Players) != 2 {
+		t.Errorf("Expected 2 players, got %d", len(snapshot.Players))
+	}
+}
+
+func TestRoomKernel_GetPlayerCount(t *testing.T) {
+	gameService := service.NewGameService()
+	config := DefaultRoomConfig
+	
+	kernel := NewRoomKernel("test-room", gameService, config)
+	
+	err := kernel.Start()
+	if err != nil {
+		t.Fatalf("Expected no error starting kernel, got %v", err)
+	}
+	defer kernel.Stop()
+	
+	// Initially no players
+	if kernel.GetPlayerCount() != 0 {
+		t.Errorf("Expected 0 players, got %d", kernel.GetPlayerCount())
+	}
+	
+	// Add players
+	for i, seat := range []domain.SeatID{domain.SeatEast, domain.SeatSouth, domain.SeatWest} {
+		err = kernel.AddPlayer(fmt.Sprintf("player%d", i+1), seat, newMockConn())
+		if err != nil {
+			t.Fatalf("Expected no error adding player %d, got %v", i+1, err)
+		}
+	}
+	
+	if kernel.GetPlayerCount() != 3 {
+		t.Errorf("Expected 3 players, got %d", kernel.GetPlayerCount())
+	}
+}
+
+func TestRoomKernel_IsEmpty(t *testing.T) {
+	gameService := service.NewGameService()
+	config := DefaultRoomConfig
+	
+	kernel := NewRoomKernel("test-room", gameService, config)
+	
+	err := kernel.Start()
+	if err != nil {
+		t.Fatalf("Expected no error starting kernel, got %v", err)
+	}
+	defer kernel.Stop()
+	
+	// Initially empty
+	if !kernel.IsEmpty() {
+		t.Error("Expected room to be empty")
+	}
+	
+	// Add player
+	err = kernel.AddPlayer("player1", domain.SeatEast, newMockConn())
+	if err != nil {
+		t.Fatalf("Expected no error adding player, got %v", err)
+	}
+	
+	if kernel.IsEmpty() {
+		t.Error("Expected room to not be empty")
+	}
+	
+	// Remove player
+	kernel.RemovePlayer(domain.SeatEast)
+	
+	if !kernel.IsEmpty() {
+		t.Error("Expected room to be empty again")
+	}
+}
+
+// MockWebSocketConn implements websocket.Conn interface for testing
+type MockWebSocketConn struct {
+	closed   bool
+	messages []interface{}
+}
+
+func (m *MockWebSocketConn) WriteJSON(v interface{}) error {
+	if m.closed {
+		return websocket.ErrCloseSent
+	}
+	m.messages = append(m.messages, v)
+	return nil
+}
+
+func (m *MockWebSocketConn) Close() error {
+	m.closed = true
+	return nil
+}
+
+func (m *MockWebSocketConn) ReadJSON(v interface{}) error {
+	return nil
+}
+
+func (m *MockWebSocketConn) ReadMessage() (messageType int, p []byte, err error) {
+	return websocket.TextMessage, []byte("{}"), nil
+}
+
+func (m *MockWebSocketConn) WriteMessage(messageType int, data []byte) error {
+	return nil
+}
+
+func (m *MockWebSocketConn) SetReadDeadline(t time.Time) error {
+	return nil
+}
+
+func (m *MockWebSocketConn) SetWriteDeadline(t time.Time) error {
+	return nil
+}
+
+func (m *MockWebSocketConn) SetPongHandler(h func(appData string) error) {
+	return
+}
+
+// Helper function to create a mock websocket connection
+func newMockConn() *websocket.Conn {
+	// This is a hack to satisfy the type system
+	// In real tests, you would use a proper mock or test server
+	return nil
+}
